@@ -33,11 +33,16 @@ type RefreshRequestResponse struct {
 
 type CustomClaims struct {
 	Username string `json:"username"`
+	UserUUID string `json:"userUUID"`
 	jwt.StandardClaims
 }
 
 type RegistrationResponse struct {
 	UserID int64 `json:"userId"`
+}
+
+type AuthenticationResponse struct {
+	UserUUID string `json:"userUUID"`
 }
 
 func NewUserAuthData(userUUID, email, accessToken, refreshToken string) UserAuthData {

@@ -33,20 +33,20 @@ func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
 	return id, err
 }
 
-func (as *AuthService) LoginUser(body models.AuthRequest) (models.UserAuthData, error) {
-	userData, err := as.AuthRepo.QueryUserByEmail(body.Email)
+func (as *AuthService) LoginUser(username, password string) (models.UserAuthData, error) {
+	userData, err := as.AuthRepo.QueryUserByEmail(username)
 
 	var userAuthData models.UserAuthData
-	if err := verifyPassword(userData.PasswordHash, body.Password); err != nil {
+	if err := verifyPassword(userData.PasswordHash, password); err != nil {
 		return userAuthData, errors.NewError(err, http.StatusUnauthorized)
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateJWT(userData.Email, accessExpiresBy)
+	accessToken, err := generateJWT(userData.Email, userData.UserUUID, accessExpiresBy)
 	// TODO: handle error
 
 	refreshExpiresBy := time.Now().AddDate(0, 12, 0).Unix()
-	refreshToken, err := generateJWT(userData.Email, refreshExpiresBy)
+	refreshToken, err := generateJWT(userData.Email, userData.UserUUID, refreshExpiresBy)
 	// TODO: handle error
 
 	userAuthData = models.NewUserAuthData(userData.UserUUID, userData.Email, accessToken, refreshToken)
@@ -54,6 +54,19 @@ func (as *AuthService) LoginUser(body models.AuthRequest) (models.UserAuthData, 
 }
 
 func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
+	claims, err := as.ValidateToken(refreshToken)
+	if err != nil {
+		return "", err
+	}
+
+	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
+	accessToken, err := generateJWT(claims.Username, claims.UserUUID, accessExpiresBy)
+	// TODO: handle error
+
+	return accessToken, err
+}
+
+func (as *AuthService) ValidateToken(refreshToken string) (*models.CustomClaims, error) {
 	parsedToken, err := jwt.ParseWithClaims(
 		refreshToken,
 		&models.CustomClaims{},
@@ -61,17 +74,22 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 			return privateKey, nil
 		},
 	)
+	if err != nil {
+		// TODO: handle error
+		return &models.CustomClaims{}, err
+	}
 
 	claims, ok := parsedToken.Claims.(*models.CustomClaims)
 	if !ok {
 		// TODO: handle error
+		return &models.CustomClaims{}, errors.NewError(nil, http.StatusUnauthorized)
 	}
 
-	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateJWT(claims.Username, accessExpiresBy)
-	// TODO: handle error
+	if time.Unix(claims.ExpiresAt, 0).Before(time.Now()) {
+		return &models.CustomClaims{}, errors.NewError(nil, http.StatusUnauthorized)
+	}
 
-	return accessToken, err
+	return claims, nil
 }
 
 func hashPassword(password string) (string, error) {
@@ -88,12 +106,14 @@ func verifyPassword(hashedPassword, password string) error {
 	return err
 }
 
-func generateJWT(username string, expiration int64) (string, error) {
+func generateJWT(username, useruuid string, expiration int64) (string, error) {
 	claims := models.CustomClaims{
 		Username: username,
+		UserUUID: useruuid,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expiration,
-			Issuer:    "ecom",
+			// TODO: use environment variable
+			Issuer: "ecom",
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

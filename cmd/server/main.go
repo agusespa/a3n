@@ -26,6 +26,7 @@ func main() {
 	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
 	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
 	http.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
+	http.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
 
 	log.Printf("Listening on port %v", port)
 	err := http.ListenAndServe(":"+port, nil)
