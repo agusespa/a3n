@@ -97,14 +97,7 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	authParts := strings.Split(authHeader, " ")
-	if len(authParts) != 2 || authParts[0] != "Bearer" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	bearerToken := authParts[1]
+	bearerToken := strings.Split(authHeader, " ")[1]
 
 	accessToken, err := h.AuthService.RefreshToken(bearerToken)
 	if err != nil {
