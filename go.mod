@@ -1,4 +1,4 @@
-module github.com/agusespa/ecom-be/auth
+module github.com/agusespa/autz
 
 go 1.20
 

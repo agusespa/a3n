@@ -1,14 +1,15 @@
 package service
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/agusespa/ecom-be/auth/internal/errors"
-	"github.com/agusespa/ecom-be/auth/internal/models"
-	"github.com/agusespa/ecom-be/auth/internal/repository"
+	"github.com/agusespa/autz/internal/httperrors"
+	"github.com/agusespa/autz/internal/models"
+	"github.com/agusespa/autz/internal/repository"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 )
@@ -26,6 +27,7 @@ func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
 
 	hashedPassword, err := hashPassword(body.Password)
 	if err != nil {
+		err := httperrors.NewError(err, http.StatusBadRequest)
 		return 0, err
 	}
 
@@ -34,20 +36,29 @@ func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
 }
 
 func (as *AuthService) LoginUser(username, password string) (models.UserAuthData, error) {
-	userData, err := as.AuthRepo.QueryUserByEmail(username)
-
 	var userAuthData models.UserAuthData
+
+	userData, err := as.AuthRepo.QueryUserByEmail(username)
+	if err != nil {
+		return userAuthData, err
+	}
+
 	if err := verifyPassword(userData.PasswordHash, password); err != nil {
-		return userAuthData, errors.NewError(err, http.StatusUnauthorized)
+		err := httperrors.NewError(err, http.StatusUnauthorized)
+		return userAuthData, err
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
 	accessToken, err := generateJWT(userData.Email, userData.UserUUID, accessExpiresBy)
-	// TODO: handle error
+	if err != nil {
+		return userAuthData, err
+	}
 
 	refreshExpiresBy := time.Now().AddDate(0, 12, 0).Unix()
 	refreshToken, err := generateJWT(userData.Email, userData.UserUUID, refreshExpiresBy)
-	// TODO: handle error
+	if err != nil {
+		return userAuthData, err
+	}
 
 	userAuthData = models.NewUserAuthData(userData.UserUUID, userData.Email, accessToken, refreshToken)
 	return userAuthData, err
@@ -61,7 +72,9 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
 	accessToken, err := generateJWT(claims.Username, claims.UserUUID, accessExpiresBy)
-	// TODO: handle error
+	if err != nil {
+		return "", err
+	}
 
 	return accessToken, err
 }
@@ -75,18 +88,14 @@ func (as *AuthService) ValidateToken(refreshToken string) (*models.CustomClaims,
 		},
 	)
 	if err != nil {
-		// TODO: handle error
+		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return &models.CustomClaims{}, err
 	}
 
 	claims, ok := parsedToken.Claims.(*models.CustomClaims)
 	if !ok {
-		// TODO: handle error
-		return &models.CustomClaims{}, errors.NewError(nil, http.StatusUnauthorized)
-	}
-
-	if time.Unix(claims.ExpiresAt, 0).Before(time.Now()) {
-		return &models.CustomClaims{}, errors.NewError(nil, http.StatusUnauthorized)
+		err := httperrors.NewError(errors.New("failed to parse token claims"), http.StatusUnauthorized)
+		return &models.CustomClaims{}, err
 	}
 
 	return claims, nil
@@ -120,7 +129,7 @@ func generateJWT(username, useruuid string, expiration int64) (string, error) {
 
 	tokenString, err := token.SignedString(privateKey)
 	if err != nil {
-		// TODOO: handle error
+		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return "", err
 	}
 

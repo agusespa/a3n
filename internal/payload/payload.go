@@ -5,11 +5,11 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/agusespa/ecom-be/auth/internal/errors"
+	"github.com/agusespa/autz/internal/httperrors"
 )
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
-	if customErr, ok := err.(*errors.Error); ok {
+	if customErr, ok := err.(*httperrors.Error); ok {
 		http.Error(w, customErr.Message(), customErr.Status())
 	} else {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

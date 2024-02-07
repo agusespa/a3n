@@ -4,10 +4,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/agusespa/ecom-be/auth/internal/database"
-	"github.com/agusespa/ecom-be/auth/internal/handlers"
-	"github.com/agusespa/ecom-be/auth/internal/repository"
-	"github.com/agusespa/ecom-be/auth/internal/service"
+	"github.com/agusespa/autz/internal/database"
+	"github.com/agusespa/autz/internal/handlers"
+	"github.com/agusespa/autz/internal/repository"
+	"github.com/agusespa/autz/internal/service"
 )
 
 func main() {

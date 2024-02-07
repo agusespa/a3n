@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/agusespa/ecom-be/auth/internal/errors"
-	"github.com/agusespa/ecom-be/auth/internal/models"
-	"github.com/agusespa/ecom-be/auth/internal/payload"
-	"github.com/agusespa/ecom-be/auth/internal/service"
+	"github.com/agusespa/autz/internal/httperrors"
+	"github.com/agusespa/autz/internal/models"
+	"github.com/agusespa/autz/internal/payload"
+	"github.com/agusespa/autz/internal/service"
 )
 
 type AuthHandler struct {
@@ -22,14 +22,15 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 
 func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		err := errors.NewError(nil, http.StatusMethodNotAllowed)
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
 	}
 
 	var authReq models.AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
-		http.Error(w, "Error parsing request body", http.StatusBadRequest)
+		err := httperrors.NewError(err, http.StatusBadRequest)
+		payload.WriteError(w, r, err)
 		return
 	}
 
@@ -48,14 +49,14 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 
 func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		err := errors.NewError(nil, http.StatusMethodNotAllowed)
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
 	}
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := errors.NewError(nil, http.StatusUnauthorized)
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -84,21 +85,21 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		err := errors.NewError(nil, http.StatusMethodNotAllowed)
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
 	}
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := errors.NewError(nil, http.StatusUnauthorized)
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
 
 	authParts := strings.Split(authHeader, " ")
 	if len(authParts) != 2 || authParts[0] != "Bearer" {
-		err := errors.NewError(nil, http.StatusUnauthorized)
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -120,27 +121,19 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 
 func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		err := errors.NewError(nil, http.StatusMethodNotAllowed)
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
 	}
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := errors.NewError(nil, http.StatusUnauthorized)
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	authParts := strings.Split(authHeader, " ")
-	if len(authParts) != 2 || authParts[0] != "Bearer" {
-		err := errors.NewError(nil, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	bearerToken := authParts[1]
-
+	bearerToken := strings.Split(authHeader, " ")[1]
 	claims, err := h.AuthService.ValidateToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
@@ -156,24 +149,24 @@ func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Re
 
 func extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
 	if !strings.HasPrefix(authHeader, "Basic ") {
-		err = errors.NewError(nil, http.StatusBadRequest)
-		return
+		err = httperrors.NewError(nil, http.StatusBadRequest)
+		return "", "", err
 	}
 
-	credsEncoded := strings.TrimPrefix(authHeader, "Basic ")
-	credsDecoded, err := base64.StdEncoding.DecodeString(credsEncoded)
+	credentialsEncoded := strings.TrimPrefix(authHeader, "Basic ")
+	credsentialsDecoded, err := base64.StdEncoding.DecodeString(credentialsEncoded)
 	if err != nil {
-		err = errors.NewError(nil, http.StatusBadRequest)
-		return
+		err = httperrors.NewError(nil, http.StatusBadRequest)
+		return "", "", err
 	}
 
-	creds := strings.SplitN(string(credsDecoded), ":", 2)
-	if len(creds) != 2 {
-		err = errors.NewError(nil, http.StatusBadRequest)
-		return
+	credentials := strings.SplitN(string(credsentialsDecoded), ":", 2)
+	if len(credentials) != 2 {
+		err = httperrors.NewError(nil, http.StatusBadRequest)
+		return "", "", err
 	}
 
-	username = creds[0]
-	password = creds[1]
+	username = credentials[0]
+	password = credentials[1]
 	return
 }
