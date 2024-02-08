@@ -1,9 +1,8 @@
 package service
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -50,18 +49,20 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 		return userAuthData, err
 	}
 
-	refreshToken, err := generateJWT(userData.UserID, userData.UserUUID, 0)
-	if err != nil {
-		return userAuthData, err
-	}
+	var refreshToken string
+	if userData.RefreshToken != "" {
+		refreshToken = userData.RefreshToken
+	} else {
+		newToken, err := generateJWT(userData.UserID, userData.UserUUID, 0)
+		if err != nil {
+			return userAuthData, err
+		}
 
-	hashedToken, err := hashToken(refreshToken)
-	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
-		return userAuthData, err
-	}
-	if err := as.AuthRepo.UpdateRefreshToken(userData.UserID, &hashedToken); err != nil {
-		return userAuthData, err
+		if err := as.AuthRepo.UpdateRefreshToken(userData.UserID, &refreshToken); err != nil {
+			return userAuthData, err
+		}
+
+		refreshToken = newToken
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
@@ -84,8 +85,10 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	fmt.Println(userData.RefreshToken)
+	fmt.Println(refreshToken)
 
-	if err := verifyHashedToken(userData.RefreshToken, refreshToken); err != nil {
+	if userData.RefreshToken != refreshToken {
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return "", err
 	}
@@ -146,33 +149,6 @@ func hashPassword(password string) (string, error) {
 func verifyHashedPassword(hashedPassword, password string) error {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	return err
-}
-
-func hashToken(token string) (string, error) {
-	hasher := sha256.New()
-
-	_, err := hasher.Write([]byte(token))
-	if err != nil {
-		return "", err
-	}
-
-	hashedTokenBytes := hasher.Sum(nil)
-	hashedToken := hex.EncodeToString(hashedTokenBytes)
-
-	return hashedToken, nil
-}
-
-func verifyHashedToken(storedToken, clientToken string) error {
-	hashedClientToken, err := hashToken(clientToken)
-	if err != nil {
-		return err
-	}
-
-	if hashedClientToken != storedToken {
-		return errors.New("token doesn't match original")
-	}
-
-	return nil
 }
 
 func generateJWT(userID int64, userUUID string, expiration int64) (string, error) {

@@ -39,10 +39,10 @@ func (repo *AuthRepository) CreateUser(uuid string, email string, passwordHash s
 
 func (repo *AuthRepository) QueryUserByEmail(email string) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
-	var refreshTokenHash sql.NullString
+	var refreshToken sql.NullString
 
 	row := repo.DB.QueryRow("SELECT * FROM user_auth WHERE email=?", email)
-	err := row.Scan(&user.UserID, &user.UserUUID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt, &refreshTokenHash)
+	err := row.Scan(&user.UserID, &user.UserUUID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt, &refreshToken)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err := httperrors.NewError(err, http.StatusNotFound)
@@ -52,8 +52,10 @@ func (repo *AuthRepository) QueryUserByEmail(email string) (models.UserAuthEntit
 		return user, err
 	}
 
-	if refreshTokenHash.Valid {
-		user.RefreshToken = refreshTokenHash.String
+	if refreshToken.Valid {
+		user.RefreshToken = refreshToken.String
+	} else {
+		user.RefreshToken = ""
 	}
 
 	return user, nil
@@ -61,10 +63,10 @@ func (repo *AuthRepository) QueryUserByEmail(email string) (models.UserAuthEntit
 
 func (repo *AuthRepository) QueryUserById(userID int64) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
-	var refreshTokenHash sql.NullString
+	var refreshToken sql.NullString
 
 	row := repo.DB.QueryRow("SELECT * FROM user_auth WHERE user_id=?", userID)
-	err := row.Scan(&user.UserID, &user.UserUUID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt, &refreshTokenHash)
+	err := row.Scan(&user.UserID, &user.UserUUID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt, &refreshToken)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err := httperrors.NewError(err, http.StatusNotFound)
@@ -74,15 +76,17 @@ func (repo *AuthRepository) QueryUserById(userID int64) (models.UserAuthEntity, 
 		return user, err
 	}
 
-	if refreshTokenHash.Valid {
-		user.RefreshToken = refreshTokenHash.String
+	if refreshToken.Valid {
+		user.RefreshToken = refreshToken.String
+	} else {
+		user.RefreshToken = ""
 	}
 
 	return user, nil
 }
 
-func (repo *AuthRepository) UpdateRefreshToken(userID int64, tokenHash *string) error {
-	_, err := repo.DB.Exec("UPDATE user_auth SET refresh_token_hash = ? WHERE user_id = ?", tokenHash, userID)
+func (repo *AuthRepository) UpdateRefreshToken(userID int64, token *string) error {
+	_, err := repo.DB.Exec("UPDATE user_auth SET refresh_token = ? WHERE user_id = ?", token, userID)
 	if err != nil {
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return err
