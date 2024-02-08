@@ -1,6 +1,8 @@
 package service
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"time"
@@ -27,7 +29,7 @@ func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
 
 	hashedPassword, err := hashPassword(body.Password)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusBadRequest)
+		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}
 
@@ -43,24 +45,32 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 		return userAuthData, err
 	}
 
-	if err := verifyPassword(userData.PasswordHash, password); err != nil {
+	if err := verifyHashedPassword(userData.PasswordHash, password); err != nil {
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return userAuthData, err
 	}
 
+	refreshToken, err := generateJWT(userData.UserID, userData.UserUUID, 0)
+	if err != nil {
+		return userAuthData, err
+	}
+
+	hashedToken, err := hashToken(refreshToken)
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return userAuthData, err
+	}
+	if err := as.AuthRepo.UpdateRefreshToken(userData.UserID, &hashedToken); err != nil {
+		return userAuthData, err
+	}
+
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateJWT(userData.Email, userData.UserUUID, accessExpiresBy)
+	accessToken, err := generateJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
 	if err != nil {
 		return userAuthData, err
 	}
 
-	refreshExpiresBy := time.Now().AddDate(0, 12, 0).Unix()
-	refreshToken, err := generateJWT(userData.Email, userData.UserUUID, refreshExpiresBy)
-	if err != nil {
-		return userAuthData, err
-	}
-
-	userAuthData = models.NewUserAuthData(userData.UserUUID, userData.Email, accessToken, refreshToken)
+	userAuthData = models.NewUserAuthData(userData.UserID, userData.UserUUID, accessToken, refreshToken)
 	return userAuthData, err
 }
 
@@ -70,13 +80,36 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 		return "", err
 	}
 
-	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateJWT(claims.Username, claims.UserUUID, accessExpiresBy)
+	userData, err := as.AuthRepo.QueryUserById(claims.UserID)
 	if err != nil {
 		return "", err
 	}
 
-	return accessToken, err
+	if err := verifyHashedToken(userData.RefreshToken, refreshToken); err != nil {
+		err := httperrors.NewError(err, http.StatusUnauthorized)
+		return "", err
+	}
+
+	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
+	accessToken, err := generateJWT(claims.UserID, claims.UserUUID, accessExpiresBy)
+	if err != nil {
+		return "", err
+	}
+
+	return accessToken, nil
+}
+
+func (as *AuthService) RevoqueToken(refreshToken string) error {
+	claims, err := as.ValidateToken(refreshToken)
+	if err != nil {
+		return err
+	}
+
+	if err := as.AuthRepo.UpdateRefreshToken(claims.UserID, nil); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (as *AuthService) ValidateToken(refreshToken string) (*models.CustomClaims, error) {
@@ -110,15 +143,42 @@ func hashPassword(password string) (string, error) {
 	return string(hashedPassword), nil
 }
 
-func verifyPassword(hashedPassword, password string) error {
+func verifyHashedPassword(hashedPassword, password string) error {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	return err
 }
 
-func generateJWT(username, useruuid string, expiration int64) (string, error) {
+func hashToken(token string) (string, error) {
+	hasher := sha256.New()
+
+	_, err := hasher.Write([]byte(token))
+	if err != nil {
+		return "", err
+	}
+
+	hashedTokenBytes := hasher.Sum(nil)
+	hashedToken := hex.EncodeToString(hashedTokenBytes)
+
+	return hashedToken, nil
+}
+
+func verifyHashedToken(storedToken, clientToken string) error {
+	hashedClientToken, err := hashToken(clientToken)
+	if err != nil {
+		return err
+	}
+
+	if hashedClientToken != storedToken {
+		return errors.New("token doesn't match original")
+	}
+
+	return nil
+}
+
+func generateJWT(userID int64, userUUID string, expiration int64) (string, error) {
 	claims := models.CustomClaims{
-		Username: username,
-		UserUUID: useruuid,
+		UserID:   userID,
+		UserUUID: userUUID,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expiration,
 			// TODO: use environment variable

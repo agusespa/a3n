@@ -13,11 +13,12 @@ type UserAuth struct {
 	PasswordHash  string    `json:"passwordHash"`
 	EmailVerified bool      `json:"emailVerified"`
 	CreatedAt     time.Time `json:"createdAt"`
+	RefreshToken  string    `json:"refreshToken"`
 }
 
 type UserAuthData struct {
+	UserID       int64  `json:"user_id"`
 	UserUUID     string `json:"userUUID"`
-	Email        string `json:"email"`
 	AccessToken  string `json:"accessToken"`
 	RefreshToken string `json:"refreshToken"`
 }
@@ -28,27 +29,27 @@ type AuthRequest struct {
 }
 
 type RefreshRequestResponse struct {
-	Token string `json:"token"`
+	AccessToken string `json:"accessToken"`
 }
 
 type CustomClaims struct {
-	Username string `json:"username"`
+	UserID   int64  `json:"userID"`
 	UserUUID string `json:"userUUID"`
 	jwt.StandardClaims
 }
 
 type RegistrationResponse struct {
-	UserID int64 `json:"userId"`
+	UserID int64 `json:"userID"`
 }
 
 type AuthenticationResponse struct {
 	UserUUID string `json:"userUUID"`
 }
 
-func NewUserAuthData(userUUID, email, accessToken, refreshToken string) UserAuthData {
+func NewUserAuthData(userID int64, userUUID, accessToken, refreshToken string) UserAuthData {
 	return UserAuthData{
+		UserID:       userID,
 		UserUUID:     userUUID,
-		Email:        email,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}

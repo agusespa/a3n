@@ -9,4 +9,5 @@ type UserAuthEntity struct {
 	PasswordHash  string    `db:"password_hash"`
 	EmailVerified bool      `db:"email_verified"`
 	CreatedAt     time.Time `db:"created_at"`
+	RefreshToken  string    `db:"refresh_token"`
 }
