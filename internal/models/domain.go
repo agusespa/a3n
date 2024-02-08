@@ -33,8 +33,9 @@ type RefreshRequestResponse struct {
 }
 
 type CustomClaims struct {
-	UserID   int64  `json:"userID"`
-	UserUUID string `json:"userUUID"`
+	UserID    int64  `json:"userID"`
+	UserUUID  string `json:"userUUID"`
+	TokenUUID string `json:"tokenUUID"`
 	jwt.StandardClaims
 }
 

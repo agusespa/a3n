@@ -67,7 +67,7 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authData, err := h.AuthService.LoginUser(username, password)
+	authData, err := h.AuthService.LoginUser(username, password, r.Host)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -180,15 +180,11 @@ func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Reque
 
 	bearerToken := strings.Split(authHeader, " ")[1]
 
-	accessToken, err := h.AuthService.RefreshToken(bearerToken)
+	err := h.AuthService.RevoqueToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	res := models.RefreshRequestResponse{
-		AccessToken: accessToken,
-	}
-
-	payload.Write(w, r, res)
+	payload.Write(w, r, "token successfully revoked")
 }

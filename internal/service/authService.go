@@ -2,7 +2,6 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -36,7 +35,7 @@ func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
 	return id, err
 }
 
-func (as *AuthService) LoginUser(username, password string) (models.UserAuthData, error) {
+func (as *AuthService) LoginUser(username, password, domain string) (models.UserAuthData, error) {
 	var userAuthData models.UserAuthData
 
 	userData, err := as.AuthRepo.QueryUserByEmail(username)
@@ -53,7 +52,7 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 	if userData.RefreshToken != "" {
 		refreshToken = userData.RefreshToken
 	} else {
-		newToken, err := generateJWT(userData.UserID, userData.UserUUID, 0)
+		newToken, err := generateRefreshJWT(userData.UserID, userData.UserUUID, domain)
 		if err != nil {
 			return userAuthData, err
 		}
@@ -66,7 +65,7 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
+	accessToken, err := generateAccessJWT(userData.UserID, userData.UserUUID, domain, accessExpiresBy)
 	if err != nil {
 		return userAuthData, err
 	}
@@ -85,8 +84,6 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(userData.RefreshToken)
-	fmt.Println(refreshToken)
 
 	if userData.RefreshToken != refreshToken {
 		err := httperrors.NewError(err, http.StatusUnauthorized)
@@ -94,7 +91,7 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateJWT(claims.UserID, claims.UserUUID, accessExpiresBy)
+	accessToken, err := generateAccessJWT(claims.UserID, claims.UserUUID, claims.Issuer, accessExpiresBy)
 	if err != nil {
 		return "", err
 	}
@@ -151,14 +148,34 @@ func verifyHashedPassword(hashedPassword, password string) error {
 	return err
 }
 
-func generateJWT(userID int64, userUUID string, expiration int64) (string, error) {
+func generateAccessJWT(userID int64, userUUID, issuer string, expiration int64) (string, error) {
 	claims := models.CustomClaims{
 		UserID:   userID,
 		UserUUID: userUUID,
 		StandardClaims: jwt.StandardClaims{
+			Issuer:    issuer,
 			ExpiresAt: expiration,
-			// TODO: use environment variable
-			Issuer: "ecom",
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString(privateKey)
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func generateRefreshJWT(userID int64, userUUID, issuer string) (string, error) {
+	tokenUUID := uuid.New().String()
+	claims := models.CustomClaims{
+		UserID:    userID,
+		UserUUID:  userUUID,
+		TokenUUID: tokenUUID,
+		StandardClaims: jwt.StandardClaims{
+			Issuer: issuer,
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
