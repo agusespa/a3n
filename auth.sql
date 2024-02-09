@@ -9,7 +9,8 @@ CREATE TABLE user_auth (
     password_hash VARCHAR(255) NOT NULL,
     email_verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    refresh_token VARCHAR(512),
+    refresh_token VARCHAR(255) NOT NULL UNIQUE,
+    token_is_revoqued BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE revoked_tokens (

@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"net/http"
+	"os"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -35,7 +36,7 @@ func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
 	return id, err
 }
 
-func (as *AuthService) LoginUser(username, password, domain string) (models.UserAuthData, error) {
+func (as *AuthService) LoginUser(username, password string) (models.UserAuthData, error) {
 	var userAuthData models.UserAuthData
 
 	userData, err := as.AuthRepo.QueryUserByEmail(username)
@@ -52,20 +53,19 @@ func (as *AuthService) LoginUser(username, password, domain string) (models.User
 	if userData.RefreshToken != "" {
 		refreshToken = userData.RefreshToken
 	} else {
-		newToken, err := generateRefreshJWT(userData.UserID, userData.UserUUID, domain)
+		newToken, err := generateRefreshJWT(userData.UserID, userData.UserUUID)
 		if err != nil {
 			return userAuthData, err
 		}
 
+		refreshToken = newToken
 		if err := as.AuthRepo.UpdateRefreshToken(userData.UserID, &refreshToken); err != nil {
 			return userAuthData, err
 		}
-
-		refreshToken = newToken
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateAccessJWT(userData.UserID, userData.UserUUID, domain, accessExpiresBy)
+	accessToken, err := generateAccessJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
 	if err != nil {
 		return userAuthData, err
 	}
@@ -80,7 +80,12 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 		return "", err
 	}
 
-	userData, err := as.AuthRepo.QueryUserById(claims.UserID)
+	if claims.Type != "refresh" {
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		return "", err
+	}
+
+	userData, err := as.AuthRepo.QueryUserById(claims.User.UserID)
 	if err != nil {
 		return "", err
 	}
@@ -91,7 +96,7 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateAccessJWT(claims.UserID, claims.UserUUID, claims.Issuer, accessExpiresBy)
+	accessToken, err := generateAccessJWT(claims.User.UserID, claims.User.UserUUID, accessExpiresBy)
 	if err != nil {
 		return "", err
 	}
@@ -105,7 +110,12 @@ func (as *AuthService) RevoqueToken(refreshToken string) error {
 		return err
 	}
 
-	if err := as.AuthRepo.UpdateRefreshToken(claims.UserID, nil); err != nil {
+	if claims.Type != "refresh" {
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		return err
+	}
+
+	if err := as.AuthRepo.UpdateRefreshToken(claims.User.UserID, nil); err != nil {
 		return err
 	}
 
@@ -113,11 +123,15 @@ func (as *AuthService) RevoqueToken(refreshToken string) error {
 }
 
 func (as *AuthService) ValidateToken(refreshToken string) (*models.CustomClaims, error) {
+	key, err := getEncryptionKey()
+	if err != nil {
+		return nil, err
+	}
 	parsedToken, err := jwt.ParseWithClaims(
 		refreshToken,
 		&models.CustomClaims{},
 		func(token *jwt.Token) (interface{}, error) {
-			return privateKey, nil
+			return key, nil
 		},
 	)
 	if err != nil {
@@ -148,18 +162,23 @@ func verifyHashedPassword(hashedPassword, password string) error {
 	return err
 }
 
-func generateAccessJWT(userID int64, userUUID, issuer string, expiration int64) (string, error) {
+func generateAccessJWT(userID int64, userUUID string, expiration int64) (string, error) {
 	claims := models.CustomClaims{
-		UserID:   userID,
-		UserUUID: userUUID,
+		User: models.TokenUser{
+			UserID:   userID,
+			UserUUID: userUUID},
+		Type: "access",
 		StandardClaims: jwt.StandardClaims{
-			Issuer:    issuer,
 			ExpiresAt: expiration,
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	tokenString, err := token.SignedString(privateKey)
+	key, err := getEncryptionKey()
+	if err != nil {
+		return "", err
+	}
+	tokenString, err := token.SignedString(key)
 	if err != nil {
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return "", err
@@ -168,19 +187,24 @@ func generateAccessJWT(userID int64, userUUID, issuer string, expiration int64) 
 	return tokenString, nil
 }
 
-func generateRefreshJWT(userID int64, userUUID, issuer string) (string, error) {
+func generateRefreshJWT(userID int64, userUUID string) (string, error) {
 	tokenUUID := uuid.New().String()
 	claims := models.CustomClaims{
-		UserID:    userID,
-		UserUUID:  userUUID,
-		TokenUUID: tokenUUID,
+		User: models.TokenUser{
+			UserID:   userID,
+			UserUUID: userUUID},
+		Type: "refresh",
 		StandardClaims: jwt.StandardClaims{
-			Issuer: issuer,
+			Id: tokenUUID,
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	tokenString, err := token.SignedString(privateKey)
+	key, err := getEncryptionKey()
+	if err != nil {
+		return "", err
+	}
+	tokenString, err := token.SignedString(key)
 	if err != nil {
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return "", err
@@ -189,4 +213,11 @@ func generateRefreshJWT(userID int64, userUUID, issuer string) (string, error) {
 	return tokenString, nil
 }
 
-var privateKey = []byte("AAAAB3NzaC1yc2EAAAADAQABAAABgQDVWRMI4ex2hUf0Lz/lPhbxIq3m28agw4XTOzYE2BwbHOlrAs23+rRyAW0jlaS1dCRz09fUGAqlxV13sQinS/VACXzvKzdCOxxGno2hGuIbxH6baXVmDRbFlK9qdeMtzXnppZ4cIVq33Y1IJYwZ1erj6QYqPhHcl4FmYuOL76/A6RptF3njBFqfU241lZuuDnbe2cFeihj0TFUOQVoH0Y/JK+Gwy0pebNy8hjnyGQZNBVeZw9R5UMxphtb2pbL1lKCoM7MDPLKGN+hhjRZyeLYEy/8AR1xiwE+R7LDaG/Zik5xQJ/YXYXMQBN2Ip4dTZdn40iuk+IWmaNT92Q5CpPvZO0aU5LWxPSLlZot4IloQZXr11ZKUXxzZvAh7OQXbolN/qTdBtKeOjw7iKvKiKGXTw6Uoq8fEUglPhX6ZcdGmELpHMx8VliXUjNPXbm9mSPk6Izx+HkcK2Zg5JLoqGNXf3wcOfbeJvEAAPafPlKFqoL/Okxgn/+fXuCh//z5Hrf0=")
+func getEncryptionKey() ([]byte, error) {
+	keyString := os.Getenv("ENCRYPTION_KEY")
+	if keyString == "" {
+		err := httperrors.NewError(nil, http.StatusInternalServerError)
+		return nil, err
+	}
+	return []byte(keyString), nil
+}

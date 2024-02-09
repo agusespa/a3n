@@ -33,10 +33,13 @@ type RefreshRequestResponse struct {
 }
 
 type CustomClaims struct {
-	UserID    int64  `json:"userID"`
-	UserUUID  string `json:"userUUID"`
-	TokenUUID string `json:"tokenUUID"`
+	User TokenUser `json:"user"`
+	Type string    `json:"type"`
 	jwt.StandardClaims
+}
+type TokenUser struct {
+	UserID   int64  `json:"userID"`
+	UserUUID string `json:"userUUID"`
 }
 
 type RegistrationResponse struct {

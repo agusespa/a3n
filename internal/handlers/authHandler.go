@@ -67,7 +67,7 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authData, err := h.AuthService.LoginUser(username, password, r.Host)
+	authData, err := h.AuthService.LoginUser(username, password)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -133,8 +133,13 @@ func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if claims.Type != "access" {
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		payload.WriteError(w, r, err)
+	}
+
 	res := models.AuthenticationResponse{
-		UserUUID: claims.UserUUID,
+		UserUUID: claims.User.UserUUID,
 	}
 
 	payload.Write(w, r, res)
