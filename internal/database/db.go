@@ -13,7 +13,7 @@ func ConnectDB() (*sql.DB, error) {
 		Passwd:    "sg46sg46",
 		Net:       "tcp",
 		Addr:      "localhost:3306",
-		DBName:    "auth",
+		DBName:    "autz",
 		ParseTime: true,
 	}
 

@@ -1,6 +1,9 @@
 package service
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"os"
@@ -49,19 +52,17 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 		return userAuthData, err
 	}
 
-	var refreshToken string
-	if userData.RefreshToken != "" {
-		refreshToken = userData.RefreshToken
-	} else {
-		newToken, err := generateRefreshJWT(userData.UserID, userData.UserUUID)
-		if err != nil {
-			return userAuthData, err
-		}
+	refreshToken, err := generateRefreshToken()
+	if err != nil {
+		return userAuthData, err
+	}
 
-		refreshToken = newToken
-		if err := as.AuthRepo.UpdateRefreshToken(userData.UserID, &refreshToken); err != nil {
-			return userAuthData, err
-		}
+	refreshTokenHash, err := hashRefreshToken(refreshToken)
+	if err != nil {
+		return userAuthData, err
+	}
+	if err := as.AuthRepo.CreateRefreshToken(userData.UserID, refreshTokenHash); err != nil {
+		return userAuthData, err
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
@@ -75,28 +76,21 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 }
 
 func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
-	claims, err := as.ValidateToken(refreshToken)
+
+	refreshTokenHash, err := hashRefreshToken(refreshToken)
 	if err != nil {
+		// TODO: handle error
 		return "", err
 	}
-
-	if claims.Type != "refresh" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
-		return "", err
-	}
-
-	userData, err := as.AuthRepo.QueryUserById(claims.User.UserID)
+	userData, err := as.AuthRepo.QueryUserByToken(refreshTokenHash)
 	if err != nil {
-		return "", err
-	}
-
-	if userData.RefreshToken != refreshToken {
+		// TODO: handle different errors
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return "", err
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateAccessJWT(claims.User.UserID, claims.User.UserUUID, accessExpiresBy)
+	accessToken, err := generateAccessJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
 	if err != nil {
 		return "", err
 	}
@@ -105,30 +99,25 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 }
 
 func (as *AuthService) RevoqueToken(refreshToken string) error {
-	claims, err := as.ValidateToken(refreshToken)
+	refreshTokenHash, err := hashRefreshToken(refreshToken)
 	if err != nil {
+		// TODO: handle error
 		return err
 	}
-
-	if claims.Type != "refresh" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
-		return err
-	}
-
-	if err := as.AuthRepo.UpdateRefreshToken(claims.User.UserID, nil); err != nil {
+	if err := as.AuthRepo.DeleteTokenByHash(refreshTokenHash); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (as *AuthService) ValidateToken(refreshToken string) (*models.CustomClaims, error) {
+func (as *AuthService) ValidateToken(token string) (*models.CustomClaims, error) {
 	key, err := getEncryptionKey()
 	if err != nil {
 		return nil, err
 	}
 	parsedToken, err := jwt.ParseWithClaims(
-		refreshToken,
+		token,
 		&models.CustomClaims{},
 		func(token *jwt.Token) (interface{}, error) {
 			return key, nil
@@ -148,17 +137,17 @@ func (as *AuthService) ValidateToken(refreshToken string) (*models.CustomClaims,
 	return claims, nil
 }
 
-func hashPassword(password string) (string, error) {
+func hashPassword(password string) ([]byte, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(hashedPassword), nil
+	return hashedPassword, nil
 }
 
-func verifyHashedPassword(hashedPassword, password string) error {
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+func verifyHashedPassword(hashedPassword []byte, password string) error {
+	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(password))
 	return err
 }
 
@@ -187,30 +176,29 @@ func generateAccessJWT(userID int64, userUUID string, expiration int64) (string,
 	return tokenString, nil
 }
 
-func generateRefreshJWT(userID int64, userUUID string) (string, error) {
-	tokenUUID := uuid.New().String()
-	claims := models.CustomClaims{
-		User: models.TokenUser{
-			UserID:   userID,
-			UserUUID: userUUID},
-		Type: "refresh",
-		StandardClaims: jwt.StandardClaims{
-			Id: tokenUUID,
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	key, err := getEncryptionKey()
-	if err != nil {
-		return "", err
-	}
-	tokenString, err := token.SignedString(key)
+func generateRefreshToken() (string, error) {
+	token := make([]byte, 96)
+	_, err := rand.Read(token)
 	if err != nil {
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return "", err
 	}
 
-	return tokenString, nil
+	encodedToken := base64.StdEncoding.EncodeToString(token)
+	return encodedToken, nil
+}
+
+func hashRefreshToken(token string) ([]byte, error) {
+	decodedToken, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return nil, err
+	}
+
+	hasher := sha256.New()
+	hasher.Write(decodedToken)
+	hashedToken := hasher.Sum(nil)
+	return hashedToken, nil
 }
 
 func getEncryptionKey() ([]byte, error) {

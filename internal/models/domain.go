@@ -6,14 +6,23 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
-type UserAuth struct {
-	UserID        int64     `json:"user_id"`
+type User struct {
+	UserID        int64     `json:"userID"`
 	UserUUID      string    `json:"userUUID"`
 	Email         string    `json:"email"`
-	PasswordHash  string    `json:"passwordHash"`
+	PasswordHash  []byte    `json:"passwordHash"`
 	EmailVerified bool      `json:"emailVerified"`
 	CreatedAt     time.Time `json:"createdAt"`
 	RefreshToken  string    `json:"refreshToken"`
+}
+
+type RefreshToken struct {
+	TokenID   int64      `json:"tokenID"`
+	TokenHash []byte     `json:"tokenHash"`
+	Revoked   bool       `json:"revoked"`
+	UserID    int64      `json:"userID"`
+	CreatedAt time.Time  `json:"createdAt"`
+	ExpiresAt *time.Time `json:"expiresAt"` // Pointer for nullable expires_at
 }
 
 type UserAuthData struct {
