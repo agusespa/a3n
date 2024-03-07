@@ -10,28 +10,16 @@ import (
 	"github.com/agusespa/autz/internal/service"
 )
 
-func main() {
-	db, dbErr := database.ConnectDB()
-	if dbErr != nil {
-		log.Fatalf("Error establishing database connection: %v", dbErr)
+func init() {
+	db, err := database.ConnectDB()
+	if err != nil {
+		log.Fatalf("Error establishing database connection: %v", err)
 	}
-
-	// TODO: get port dinamically
-	port := "3001"
 
 	authRepository := repository.NewAuthRepository(db)
 	authService := service.NewProductService(authRepository)
 	authHandler := handlers.NewAuthHandler(authService)
-	initHandlers(authHandler)
 
-	log.Printf("Listening on port %v", port)
-	err := http.ListenAndServe(":"+port, nil)
-	if err != nil {
-		log.Fatalf("Error starting the HTTP server: %v", err)
-	}
-}
-
-func initHandlers(authHandler *handlers.AuthHandler) {
 	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
 	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
 	http.HandleFunc("/authapi/user", authHandler.HandleUserDataEdit)
@@ -39,4 +27,15 @@ func initHandlers(authHandler *handlers.AuthHandler) {
 	http.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
 	http.HandleFunc("/authapi/logout/all", authHandler.HandleUserTokensRevocation)
 	http.HandleFunc("/authapi/logout", authHandler.HandleTokenRevocation)
+}
+
+func main() {
+	// TODO: get port dinamically
+	port := "3001"
+	log.Printf("Listening on port %v", port)
+
+	err := http.ListenAndServe(":"+port, nil)
+	if err != nil {
+		log.Fatalf("Error starting the HTTP server: %v", err)
+	}
 }
