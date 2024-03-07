@@ -47,6 +47,47 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 	payload.Write(w, r, res)
 }
 
+func (h *AuthHandler) HandleUserDataEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	bearerToken := strings.Split(authHeader, " ")[1]
+	claims, err := h.AuthService.ValidateToken(bearerToken)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	var authReq models.AuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
+		err := httperrors.NewError(err, http.StatusBadRequest)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	id, err := h.AuthService.EditUserData(claims.User.UserID, authReq)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	res := models.RegistrationResponse{
+		UserID: id,
+	}
+
+	payload.Write(w, r, res)
+}
+
 func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -170,7 +211,7 @@ func extractBasicAuthCredentials(authHeader string) (username, password string, 
 }
 
 func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
+	if r.Method != http.MethodDelete {
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -192,4 +233,29 @@ func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Reque
 	}
 
 	payload.Write(w, r, "token successfully revoked")
+}
+
+func (h *AuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	bearerToken := strings.Split(authHeader, " ")[1]
+
+	err := h.AuthService.RevoqueUserTokens(bearerToken)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	payload.Write(w, r, "all user tokens successfully revoked")
 }

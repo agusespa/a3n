@@ -39,6 +39,21 @@ func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
 	return id, err
 }
 
+func (as *AuthService) EditUserData(userID int64, body models.AuthRequest) (int64, error) {
+	var hashedPassword []byte
+	if body.Password != "" {
+		var err error
+		hashedPassword, err = hashPassword(body.Password)
+		if err != nil {
+			err := httperrors.NewError(err, http.StatusInternalServerError)
+			return 0, err
+		}
+	}
+
+	id, err := as.AuthRepo.UpdateUser(userID, body.Email, &hashedPassword)
+	return id, err
+}
+
 func (as *AuthService) LoginUser(username, password string) (models.UserAuthData, error) {
 	var userAuthData models.UserAuthData
 
@@ -79,12 +94,10 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 
 	refreshTokenHash, err := hashRefreshToken(refreshToken)
 	if err != nil {
-		// TODO: handle error
 		return "", err
 	}
 	userData, err := as.AuthRepo.QueryUserByToken(refreshTokenHash)
 	if err != nil {
-		// TODO: handle different errors
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return "", err
 	}
@@ -101,10 +114,26 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 func (as *AuthService) RevoqueToken(refreshToken string) error {
 	refreshTokenHash, err := hashRefreshToken(refreshToken)
 	if err != nil {
-		// TODO: handle error
 		return err
 	}
 	if err := as.AuthRepo.DeleteTokenByHash(refreshTokenHash); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (as *AuthService) RevoqueUserTokens(refreshToken string) error {
+	refreshTokenHash, err := hashRefreshToken(refreshToken)
+	if err != nil {
+		return err
+	}
+	userData, err := as.AuthRepo.QueryUserByToken(refreshTokenHash)
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusUnauthorized)
+		return err
+	}
+	if err := as.AuthRepo.DeleteUserTokensById(userData.UserID); err != nil {
 		return err
 	}
 

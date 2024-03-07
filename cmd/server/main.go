@@ -22,16 +22,21 @@ func main() {
 	authRepository := repository.NewAuthRepository(db)
 	authService := service.NewProductService(authRepository)
 	authHandler := handlers.NewAuthHandler(authService)
-
-	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
-	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
-	http.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
-	http.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
-	http.HandleFunc("/authapi/revoque", authHandler.HandleTokenRevocation)
+	initHandlers(authHandler)
 
 	log.Printf("Listening on port %v", port)
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		log.Fatalf("Error starting the HTTP server: %v", err)
 	}
+}
+
+func initHandlers(authHandler *handlers.AuthHandler) {
+	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
+	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
+	http.HandleFunc("/authapi/user", authHandler.HandleUserDataEdit)
+	http.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
+	http.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
+	http.HandleFunc("/authapi/logout/all", authHandler.HandleUserTokensRevocation)
+	http.HandleFunc("/authapi/logout", authHandler.HandleTokenRevocation)
 }
