@@ -3,16 +3,17 @@ package database
 import (
 	"database/sql"
 
+	"github.com/agusespa/a3n/internal/models"
 	"github.com/go-sql-driver/mysql"
 )
 
-func ConnectDB() (*sql.DB, error) {
+func ConnectDB(config models.Config, password string) (*sql.DB, error) {
 	cfg := mysql.Config{
-		User:      "root",
-		Passwd:    "sg46sg46",
+		User:      config.DBUser,
+		Passwd:    password,
 		Net:       "tcp",
-		Addr:      "localhost:3306",
-		DBName:    "autz",
+		Addr:      config.DBAddr,
+		DBName:    config.DBName,
 		ParseTime: true,
 	}
 

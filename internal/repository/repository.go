@@ -3,10 +3,9 @@ package repository
 import (
 	"database/sql"
 	"net/http"
-	"strings"
 
-	"github.com/agusespa/autz/internal/httperrors"
-	"github.com/agusespa/autz/internal/models"
+	"github.com/agusespa/a3n/internal/httperrors"
+	"github.com/agusespa/a3n/internal/models"
 	"github.com/go-sql-driver/mysql"
 )
 
@@ -72,29 +71,34 @@ func (repo *AuthRepository) QueryUserById(userID int64) (models.UserAuthEntity, 
 	return user, nil
 }
 
-func (repo *AuthRepository) UpdateUser(userID int64, email string, hashedPassword *[]byte) (int64, error) {
-	query := "UPDATE users SET "
-	var args []interface{}
-
-	if email != "" {
-		query += "email = ?, "
-		args = append(args, email)
-	}
-	if *hashedPassword != nil {
-		query += "password_hash = ?, "
-		args = append(args, *hashedPassword)
-	}
-
-	query = strings.TrimSuffix(query, ", ")
-	query += " WHERE user_id = ?"
-	args = append(args, userID)
-
-	result, err := repo.DB.Exec(query, args...)
+func (repo *AuthRepository) UpdateUserEmail(userID int64, email string) (int64, error) {
+	result, err := repo.DB.Exec("UPDATE users SET email = ? WHERE user_id = ?", email, userID)
 	if err != nil {
 		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1064 {
 			err := httperrors.NewError(err, http.StatusBadRequest)
 			return 0, err
 		}
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return 0, err
+	}
+
+	if rowsAffected == 0 {
+		err := httperrors.NewError(err, http.StatusBadRequest)
+		return 0, err
+	}
+
+	return userID, nil
+}
+
+func (repo *AuthRepository) UpdateUserPassword(userID int64, hashedPassword *[]byte) (int64, error) {
+	result, err := repo.DB.Exec("UPDATE users SET password_hash = ? WHERE user_id = ?", *hashedPassword, userID)
+	if err != nil {
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}

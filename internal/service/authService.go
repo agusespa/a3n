@@ -6,27 +6,39 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
-	"os"
+	"net/mail"
+	"regexp"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/agusespa/autz/internal/httperrors"
-	"github.com/agusespa/autz/internal/models"
-	"github.com/agusespa/autz/internal/repository"
+	"github.com/agusespa/a3n/internal/httperrors"
+	"github.com/agusespa/a3n/internal/models"
+	"github.com/agusespa/a3n/internal/repository"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 )
 
 type AuthService struct {
-	AuthRepo *repository.AuthRepository
+	AuthRepo      *repository.AuthRepository
+	EncryptionKey []byte
+	EmailSrv      *EmailService
 }
 
-func NewProductService(authRepo *repository.AuthRepository) *AuthService {
-	return &AuthService{AuthRepo: authRepo}
+func NewAuthService(authRepo *repository.AuthRepository, key string, emailSrv *EmailService) *AuthService {
+	return &AuthService{AuthRepo: authRepo, EncryptionKey: []byte(key), EmailSrv: emailSrv}
 }
 
 func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
+	if !isValidEmail(body.Email) {
+		err := httperrors.NewError(errors.New("not a valid email address"), http.StatusBadRequest)
+		return 0, err
+	}
+	if !isValidPassword(body.Password) {
+		err := httperrors.NewError(errors.New("password doesn't meet minimum criteria"), http.StatusBadRequest)
+		return 0, err
+	}
+
 	uuidStr := uuid.New().String()
 
 	hashedPassword, err := hashPassword(body.Password)
@@ -39,18 +51,49 @@ func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
 	return id, err
 }
 
-func (as *AuthService) EditUserData(userID int64, body models.AuthRequest) (int64, error) {
-	var hashedPassword []byte
-	if body.Password != "" {
-		var err error
-		hashedPassword, err = hashPassword(body.Password)
-		if err != nil {
-			err := httperrors.NewError(err, http.StatusInternalServerError)
-			return 0, err
-		}
+func (as *AuthService) EditUserEmail(username, password, newEmail string) (int64, error) {
+	if !isValidEmail(newEmail) {
+		err := httperrors.NewError(errors.New("not a valid email address"), http.StatusBadRequest)
+		return 0, err
 	}
 
-	id, err := as.AuthRepo.UpdateUser(userID, body.Email, &hashedPassword)
+	userData, err := as.AuthRepo.QueryUserByEmail(username)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := verifyHashedPassword(userData.PasswordHash, password); err != nil {
+		err := httperrors.NewError(err, http.StatusUnauthorized)
+		return 0, err
+	}
+
+	id, err := as.AuthRepo.UpdateUserEmail(userData.UserID, newEmail)
+	return id, err
+}
+
+func (as *AuthService) EditUserPassword(username, password, newPassword string) (int64, error) {
+	if !isValidPassword(newPassword) {
+		err := httperrors.NewError(errors.New("password doesn't meet minimum criteria"), http.StatusBadRequest)
+		return 0, err
+	}
+
+	userData, err := as.AuthRepo.QueryUserByEmail(username)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := verifyHashedPassword(userData.PasswordHash, password); err != nil {
+		err := httperrors.NewError(err, http.StatusUnauthorized)
+		return 0, err
+	}
+
+	hashedPassword, err := hashPassword(newPassword)
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return 0, err
+	}
+
+	id, err := as.AuthRepo.UpdateUserPassword(userData.UserID, &hashedPassword)
 	return id, err
 }
 
@@ -81,7 +124,7 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateAccessJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
+	accessToken, err := as.generateAccessJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
 	if err != nil {
 		return userAuthData, err
 	}
@@ -103,7 +146,7 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 	}
 
 	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := generateAccessJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
+	accessToken, err := as.generateAccessJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
 	if err != nil {
 		return "", err
 	}
@@ -141,15 +184,11 @@ func (as *AuthService) RevoqueUserTokens(refreshToken string) error {
 }
 
 func (as *AuthService) ValidateToken(token string) (*models.CustomClaims, error) {
-	key, err := getEncryptionKey()
-	if err != nil {
-		return nil, err
-	}
 	parsedToken, err := jwt.ParseWithClaims(
 		token,
 		&models.CustomClaims{},
 		func(token *jwt.Token) (interface{}, error) {
-			return key, nil
+			return as.EncryptionKey, nil
 		},
 	)
 	if err != nil {
@@ -166,6 +205,17 @@ func (as *AuthService) ValidateToken(token string) (*models.CustomClaims, error)
 	return claims, nil
 }
 
+func isValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+func isValidPassword(password string) bool {
+	regexPattern := `^.{8,}$`
+	match, _ := regexp.MatchString(regexPattern, password)
+	return match
+}
+
 func hashPassword(password string) ([]byte, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -180,7 +230,7 @@ func verifyHashedPassword(hashedPassword []byte, password string) error {
 	return err
 }
 
-func generateAccessJWT(userID int64, userUUID string, expiration int64) (string, error) {
+func (as *AuthService) generateAccessJWT(userID int64, userUUID string, expiration int64) (string, error) {
 	claims := models.CustomClaims{
 		User: models.TokenUser{
 			UserID:   userID,
@@ -192,11 +242,7 @@ func generateAccessJWT(userID int64, userUUID string, expiration int64) (string,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	key, err := getEncryptionKey()
-	if err != nil {
-		return "", err
-	}
-	tokenString, err := token.SignedString(key)
+	tokenString, err := token.SignedString(as.EncryptionKey)
 	if err != nil {
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return "", err
@@ -228,13 +274,4 @@ func hashRefreshToken(token string) ([]byte, error) {
 	hasher.Write(decodedToken)
 	hashedToken := hasher.Sum(nil)
 	return hashedToken, nil
-}
-
-func getEncryptionKey() ([]byte, error) {
-	keyString := os.Getenv("ENCRYPTION_KEY")
-	if keyString == "" {
-		err := httperrors.NewError(nil, http.StatusInternalServerError)
-		return nil, err
-	}
-	return []byte(keyString), nil
 }

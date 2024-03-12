@@ -1,3 +1,3 @@
 ** Do NOT use -- Work in progress **
 
-AUTZ is a fast and light-weight authentication microservice.
+A3N is a fast and light-weight authentication microservice.

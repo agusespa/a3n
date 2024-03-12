@@ -1,0 +1,8 @@
+{
+    "db_user": "root",
+    "db_addr": "localhost:3306",
+    "db_name": "autz",
+    "email_provider": "sendgrid",
+    "email_sender_addr": "no-reply@ecom.com",
+    "email_sender_name": "eCom"
+}

@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/agusespa/autz/internal/httperrors"
+	"github.com/agusespa/a3n/internal/httperrors"
 )
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {

@@ -1,28 +1,60 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 
-	"github.com/agusespa/autz/internal/database"
-	"github.com/agusespa/autz/internal/handlers"
-	"github.com/agusespa/autz/internal/repository"
-	"github.com/agusespa/autz/internal/service"
+	"github.com/agusespa/a3n/internal/database"
+	"github.com/agusespa/a3n/internal/handlers"
+	"github.com/agusespa/a3n/internal/models"
+	"github.com/agusespa/a3n/internal/repository"
+	"github.com/agusespa/a3n/internal/service"
 )
 
 func init() {
-	db, err := database.ConnectDB()
+	configFile, err := os.ReadFile("config.json")
+	if err != nil {
+		log.Fatalf("Error reading config file: %v", err)
+	}
+	var config models.Config
+	err = json.Unmarshal(configFile, &config)
+	if err != nil {
+		log.Fatalf("Error parsing config file: %v", err)
+		return
+	}
+
+	encryptionKey := os.Getenv("ENCRYPTION_KEY")
+	if encryptionKey == "" {
+		log.Fatal("Error getting ENCRYPTION_KEY variable")
+	}
+	dbPassword := os.Getenv("DB_PASSWORD")
+	if dbPassword == "" {
+		log.Fatal("Error getting DB_PASSWORD variable")
+	}
+	emailApiKey := os.Getenv("EMAIL_API_KEY")
+	if emailApiKey == "" {
+		log.Fatal("Error getting EMAIL_API_KEY variable")
+	}
+
+	db, err := database.ConnectDB(config, dbPassword)
 	if err != nil {
 		log.Fatalf("Error establishing database connection: %v", err)
 	}
 
 	authRepository := repository.NewAuthRepository(db)
-	authService := service.NewProductService(authRepository)
+
+	emailService := service.NewEmailService(config, emailApiKey)
+
+	authService := service.NewAuthService(authRepository, encryptionKey, emailService)
+
 	authHandler := handlers.NewAuthHandler(authService)
 
 	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
 	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
-	http.HandleFunc("/authapi/user", authHandler.HandleUserDataEdit)
+	http.HandleFunc("/authapi/user/email", authHandler.HandleUserEmailChange)
+	http.HandleFunc("/authapi/user/password", authHandler.HandleUserPasswordChange)
 	http.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
 	http.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
 	http.HandleFunc("/authapi/logout/all", authHandler.HandleUserTokensRevocation)
@@ -30,8 +62,10 @@ func init() {
 }
 
 func main() {
-	// TODO: get port dinamically
-	port := "3001"
+	port := os.Getenv("AUTH_PORT")
+	if port == "" {
+		port = "3001"
+	}
 	log.Printf("Listening on port %v", port)
 
 	err := http.ListenAndServe(":"+port, nil)

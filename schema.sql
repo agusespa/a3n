@@ -1,6 +1,6 @@
-CREATE DATABASE autz;
+CREATE DATABASE auth;
 
-USE autz;
+USE auth;
 
 CREATE TABLE users (
 user_id INT AUTO_INCREMENT PRIMARY KEY,

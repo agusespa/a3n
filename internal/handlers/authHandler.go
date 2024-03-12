@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/agusespa/autz/internal/httperrors"
-	"github.com/agusespa/autz/internal/models"
-	"github.com/agusespa/autz/internal/payload"
-	"github.com/agusespa/autz/internal/service"
+	"github.com/agusespa/a3n/internal/httperrors"
+	"github.com/agusespa/a3n/internal/models"
+	"github.com/agusespa/a3n/internal/payload"
+	"github.com/agusespa/a3n/internal/service"
 )
 
 type AuthHandler struct {
@@ -47,7 +47,7 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 	payload.Write(w, r, res)
 }
 
-func (h *AuthHandler) HandleUserDataEdit(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
@@ -61,8 +61,7 @@ func (h *AuthHandler) HandleUserDataEdit(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	bearerToken := strings.Split(authHeader, " ")[1]
-	claims, err := h.AuthService.ValidateToken(bearerToken)
+	username, password, err := extractBasicAuthCredentials(authHeader)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -75,7 +74,47 @@ func (h *AuthHandler) HandleUserDataEdit(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	id, err := h.AuthService.EditUserData(claims.User.UserID, authReq)
+	id, err := h.AuthService.EditUserEmail(username, password, authReq.Email)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	res := models.RegistrationResponse{
+		UserID: id,
+	}
+
+	payload.Write(w, r, res)
+}
+
+func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	username, password, err := extractBasicAuthCredentials(authHeader)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	var authReq models.AuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
+		err := httperrors.NewError(err, http.StatusBadRequest)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	id, err := h.AuthService.EditUserPassword(username, password, authReq.Password)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
