@@ -19,12 +19,16 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func Write(w http.ResponseWriter, r *http.Request, payload interface{}) {
+	if payload == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	jsonBytes, err := json.Marshal(payload)
 	if err != nil {
 		WriteError(w, r, err)
 		return
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(jsonBytes); err != nil {

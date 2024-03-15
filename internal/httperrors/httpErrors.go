@@ -31,7 +31,7 @@ func (e *Error) Message() string {
 	case http.StatusUnauthorized:
 		return "Unauthorized"
 	case http.StatusForbidden:
-		return "You do not have permission to perform this action"
+		return "You do not have enough permissions"
 	case http.StatusNotFound:
 		return "The requested resource was not found"
 	case http.StatusMethodNotAllowed:

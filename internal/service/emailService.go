@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/agusespa/a3n/internal/models"
@@ -17,25 +16,24 @@ type EmailService struct {
 }
 
 func NewEmailService(config models.Config, key string) *EmailService {
-	return &EmailService{Provider: config.EMAILProvider, ApiKey: key, SenderName: config.EMAILSenderName, SenderAddr: config.EMAILSenderAddr}
+	return &EmailService{Provider: config.Email.Provider, ApiKey: key, SenderName: config.Email.Sender.Name, SenderAddr: config.Email.Sender.Address}
 }
 
-func (es *EmailService) SendEmail(toName, toAddr, subject, body, template string) error {
+func (es *EmailService) SendEmail(email *mail.SGMailV3) error {
+	client := sendgrid.NewSendClient(es.ApiKey)
+	response, err := client.Send(email)
+	// TODO: handle error logs better?
+	if err != nil {
+		log.Printf("email error: %v", err.Error())
+	}
+	log.Printf("email response: %v", response)
+	return err
+}
+
+func (es *EmailService) BuildEmail(toName, toAddr, subject, body, template string) *mail.SGMailV3 {
 	from := mail.NewEmail(es.SenderName, es.SenderAddr)
 	to := mail.NewEmail(toName, toAddr)
 	plainTextContent := body
 	htmlContent := template
-	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
-	client := sendgrid.NewSendClient(es.ApiKey)
-	response, err := client.Send(message)
-
-	// TODO
-	if err != nil {
-		log.Println(err)
-	} else {
-		fmt.Println(response.StatusCode)
-		fmt.Println(response.Body)
-		fmt.Println(response.Headers)
-	}
-	return nil
+	return mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
 }

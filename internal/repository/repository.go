@@ -17,8 +17,14 @@ func NewAuthRepository(db *sql.DB) *AuthRepository {
 	return &AuthRepository{DB: db}
 }
 
-func (repo *AuthRepository) CreateUser(uuid, email string, passwordHash []byte) (int64, error) {
-	result, err := repo.DB.Exec("INSERT INTO users (user_uuid, email, password_hash) VALUES (?, ?, ?)", uuid, email, passwordHash)
+func (repo *AuthRepository) CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error) {
+	var middleName interface{}
+	if body.MiddleName == "" {
+		middleName = nil
+	} else {
+		middleName = body.MiddleName
+	}
+	result, err := repo.DB.Exec("INSERT INTO users (user_uuid, first_name, middle_name, last_name, email, password_hash) VALUES (?, ?, ?, ?, ?, ?)", uuid, body.FirstName, middleName, body.LastName, body.Email, passwordHash)
 	if err != nil {
 		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
 			err := httperrors.NewError(err, http.StatusConflict)
@@ -41,7 +47,7 @@ func (repo *AuthRepository) QueryUserByEmail(email string) (models.UserAuthEntit
 	var user models.UserAuthEntity
 
 	row := repo.DB.QueryRow("SELECT * FROM users WHERE email=?", email)
-	err := row.Scan(&user.UserID, &user.UserUUID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
+	err := row.Scan(&user.UserID, &user.UserUUID, &user.FirstName, &user.MiddleName, &user.LastName, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err := httperrors.NewError(err, http.StatusNotFound)
@@ -58,7 +64,7 @@ func (repo *AuthRepository) QueryUserById(userID int64) (models.UserAuthEntity, 
 	var user models.UserAuthEntity
 
 	row := repo.DB.QueryRow("SELECT * FROM users WHERE user_id=?", userID)
-	err := row.Scan(&user.UserID, &user.UserUUID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
+	err := row.Scan(&user.UserID, &user.UserUUID, &user.FirstName, &user.MiddleName, &user.LastName, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err := httperrors.NewError(err, http.StatusNotFound)
@@ -69,6 +75,27 @@ func (repo *AuthRepository) QueryUserById(userID int64) (models.UserAuthEntity, 
 	}
 
 	return user, nil
+}
+
+func (repo *AuthRepository) UpdateUserEmailVerification(email string) error {
+	result, err := repo.DB.Exec("UPDATE users SET email_verified = ? WHERE email = ?", true, email)
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return err
+	}
+
+	if rowsAffected == 0 {
+		err := httperrors.NewError(err, http.StatusBadRequest)
+		return err
+	}
+
+	return nil
 }
 
 func (repo *AuthRepository) UpdateUserEmail(userID int64, email string) (int64, error) {
@@ -127,7 +154,7 @@ func (repo *AuthRepository) QueryUserByToken(tokenHash []byte) (models.UserAuthE
       WHERE tokens.token_hash = ? 
   `
 	row := repo.DB.QueryRow(query, tokenHash)
-	err := row.Scan(&user.UserID, &user.UserUUID, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
+	err := row.Scan(&user.UserID, &user.UserUUID, &user.FirstName, &user.MiddleName, &user.LastName, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err := httperrors.NewError(err, http.StatusNotFound)

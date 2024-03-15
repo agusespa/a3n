@@ -27,14 +27,14 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var authReq models.AuthRequest
-	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
+	var userReq models.UserRequest
+	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
 		err := httperrors.NewError(err, http.StatusBadRequest)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	id, err := h.AuthService.RegisterNewUser(authReq)
+	id, err := h.AuthService.RegisterNewUser(userReq)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -190,6 +190,41 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 	}
 
 	payload.Write(w, r, res)
+}
+
+func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	bearerToken := strings.Split(authHeader, " ")[1]
+	claims, err := h.AuthService.ValidateToken(bearerToken)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if claims.Type != "email_verify" {
+		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		payload.WriteError(w, r, err)
+	}
+
+	err = h.AuthService.EditUserEmailVerification(claims.Email)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	payload.Write(w, r, nil)
 }
 
 func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {

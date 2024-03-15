@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"log"
 	"net/http"
 	"net/mail"
 	"regexp"
@@ -17,25 +18,34 @@ import (
 	"github.com/agusespa/a3n/internal/repository"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
+	email "github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 type AuthService struct {
-	AuthRepo      *repository.AuthRepository
-	EncryptionKey []byte
-	EmailSrv      *EmailService
+	AuthRepo        *repository.AuthRepository
+	EncryptionKey   []byte
+	RefreshTokenExp int
+	AccessTokenExp  int
+	EmailSrv        *EmailService
+	ClientDomain    string
+	HardVerify      bool
 }
 
-func NewAuthService(authRepo *repository.AuthRepository, key string, emailSrv *EmailService) *AuthService {
-	return &AuthService{AuthRepo: authRepo, EncryptionKey: []byte(key), EmailSrv: emailSrv}
+func NewAuthService(authRepo *repository.AuthRepository, config models.Config, emailSrv *EmailService, encryptionKey string) *AuthService {
+	return &AuthService{AuthRepo: authRepo, EncryptionKey: []byte(encryptionKey), RefreshTokenExp: config.Token.RefreshExp, AccessTokenExp: config.Token.AccessExp, EmailSrv: emailSrv, ClientDomain: config.Client.Domain, HardVerify: config.Email.HardVerify}
 }
 
-func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
+func (as *AuthService) RegisterNewUser(body models.UserRequest) (int64, error) {
 	if !isValidEmail(body.Email) {
 		err := httperrors.NewError(errors.New("not a valid email address"), http.StatusBadRequest)
 		return 0, err
 	}
 	if !isValidPassword(body.Password) {
 		err := httperrors.NewError(errors.New("password doesn't meet minimum criteria"), http.StatusBadRequest)
+		return 0, err
+	}
+	if body.FirstName == "" || body.LastName == "" {
+		err := httperrors.NewError(errors.New("name not provided"), http.StatusBadRequest)
 		return 0, err
 	}
 
@@ -47,8 +57,41 @@ func (as *AuthService) RegisterNewUser(body models.AuthRequest) (int64, error) {
 		return 0, err
 	}
 
-	id, err := as.AuthRepo.CreateUser(uuidStr, body.Email, hashedPassword)
-	return id, err
+	id, err := as.AuthRepo.CreateUser(uuidStr, body, hashedPassword)
+	if err != nil {
+		return 0, err
+	}
+
+	verificationEmail, err := as.BuildVerificationEmail(body.FirstName, body.LastName, body.Email)
+	if err != nil {
+		log.Printf("error: %v", err.Error())
+	} else {
+		as.EmailSrv.SendEmail(verificationEmail)
+	}
+
+	return id, nil
+}
+
+func (as *AuthService) BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error) {
+	fullName := firstName + " " + lastName
+	subject := "Verify address"
+
+	token, err := as.generateEmailVerifyJWT(email)
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return nil, err
+	}
+
+	link := as.ClientDomain + "/verify/" + token
+	message := "Follow this link to verify your email address: " + link
+	template := "<p>Follow this link to verify your email address:&nbsp;</p><a>" + link + "</a>"
+
+	return as.EmailSrv.BuildEmail(fullName, email, subject, message, template), nil
+}
+
+func (as *AuthService) EditUserEmailVerification(email string) error {
+	err := as.AuthRepo.UpdateUserEmailVerification(email)
+	return err
 }
 
 func (as *AuthService) EditUserEmail(username, password, newEmail string) (int64, error) {
@@ -105,6 +148,20 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 		return userAuthData, err
 	}
 
+	if !userData.EmailVerified {
+		verificationEmail, err := as.BuildVerificationEmail(userData.FirstName, userData.LastName, userData.Email)
+		if err != nil {
+			log.Printf("error: %v", err.Error())
+		} else {
+			as.EmailSrv.SendEmail(verificationEmail)
+		}
+		if as.HardVerify {
+			customError := errors.New("email verification required")
+			err := httperrors.NewError(customError, http.StatusForbidden)
+			return userAuthData, err
+		}
+	}
+
 	if err := verifyHashedPassword(userData.PasswordHash, password); err != nil {
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return userAuthData, err
@@ -123,13 +180,12 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 		return userAuthData, err
 	}
 
-	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := as.generateAccessJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
+	accessToken, err := as.generateAccessJWT(userData.UserID, userData.UserUUID)
 	if err != nil {
 		return userAuthData, err
 	}
 
-	userAuthData = models.NewUserAuthData(userData.UserID, userData.UserUUID, accessToken, refreshToken)
+	userAuthData = models.NewUserAuthData(userData.UserID, userData.EmailVerified, userData.UserUUID, accessToken, refreshToken)
 	return userAuthData, err
 }
 
@@ -145,8 +201,7 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 		return "", err
 	}
 
-	accessExpiresBy := time.Now().Add(5 * time.Minute).Unix()
-	accessToken, err := as.generateAccessJWT(userData.UserID, userData.UserUUID, accessExpiresBy)
+	accessToken, err := as.generateAccessJWT(userData.UserID, userData.UserUUID)
 	if err != nil {
 		return "", err
 	}
@@ -230,14 +285,15 @@ func verifyHashedPassword(hashedPassword []byte, password string) error {
 	return err
 }
 
-func (as *AuthService) generateAccessJWT(userID int64, userUUID string, expiration int64) (string, error) {
+func (as *AuthService) generateAccessJWT(userID int64, userUUID string) (string, error) {
+	accessExpiresBy := time.Now().Add(time.Duration(as.AccessTokenExp) * time.Minute).Unix()
 	claims := models.CustomClaims{
 		User: models.TokenUser{
 			UserID:   userID,
 			UserUUID: userUUID},
 		Type: "access",
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expiration,
+			ExpiresAt: accessExpiresBy,
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -274,4 +330,24 @@ func hashRefreshToken(token string) ([]byte, error) {
 	hasher.Write(decodedToken)
 	hashedToken := hasher.Sum(nil)
 	return hashedToken, nil
+}
+
+func (as *AuthService) generateEmailVerifyJWT(email string) (string, error) {
+	expiration := time.Now().Add(60 * time.Minute).Unix()
+	claims := models.CustomClaims{
+		Email: email,
+		Type:  "email_verify",
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: expiration,
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString(as.EncryptionKey)
+	if err != nil {
+		err := httperrors.NewError(err, http.StatusInternalServerError)
+		return "", err
+	}
+
+	return tokenString, nil
 }

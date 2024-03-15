@@ -1,10 +1,34 @@
 package models
 
 type Config struct {
-	DBUser          string `json:"db_user"`
-	DBAddr          string `json:"db_addr"`
-	DBName          string `json:"db_name"`
-	EMAILProvider   string `json:"email_provider"`
-	EMAILSenderAddr string `json:"email_sender_addr"`
-	EMAILSenderName string `json:"email_sender_name"`
+	Client   Client   `json:"client"`
+	Database Database `json:"database"`
+	Token    Token    `json:"token"`
+	Email    Email    `json:"email"`
+}
+
+type Client struct {
+	Domain string `json:"domain"`
+}
+
+type Database struct {
+	User    string `json:"user"`
+	Address string `json:"address"`
+	Name    string `json:"name"`
+}
+
+type Token struct {
+	RefreshExp int `json:"refreshExp"`
+	AccessExp  int `json:"accessExp"`
+}
+
+type Email struct {
+	Provider   string `json:"provider"`
+	Sender     Sender `json:"sender"`
+	HardVerify bool   `json:"hardVerify"`
+}
+
+type Sender struct {
+	Address string `json:"address"`
+	Name    string `json:"name"`
 }

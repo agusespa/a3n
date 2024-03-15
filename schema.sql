@@ -5,6 +5,9 @@ USE auth;
 CREATE TABLE users (
 user_id INT AUTO_INCREMENT PRIMARY KEY,
 user_uuid VARCHAR(36) NOT NULL UNIQUE,
+first_name VARCHAR(20) NOT NULL,
+middle_name VARCHAR(20),
+last_name VARCHAR(30) NOT NULL,
 email VARCHAR(100) NOT NULL UNIQUE,
 password_hash BINARY(64) NOT NULL,
 email_verified BOOLEAN DEFAULT FALSE,

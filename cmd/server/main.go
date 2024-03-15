@@ -25,15 +25,15 @@ func init() {
 		return
 	}
 
-	encryptionKey := os.Getenv("ENCRYPTION_KEY")
+	encryptionKey := os.Getenv("A3N_ENCRYPTION_KEY")
 	if encryptionKey == "" {
 		log.Fatal("Error getting ENCRYPTION_KEY variable")
 	}
-	dbPassword := os.Getenv("DB_PASSWORD")
+	dbPassword := os.Getenv("A3N_DB_PASSWORD")
 	if dbPassword == "" {
 		log.Fatal("Error getting DB_PASSWORD variable")
 	}
-	emailApiKey := os.Getenv("EMAIL_API_KEY")
+	emailApiKey := os.Getenv("A3N_EMAIL_API_KEY")
 	if emailApiKey == "" {
 		log.Fatal("Error getting EMAIL_API_KEY variable")
 	}
@@ -47,12 +47,13 @@ func init() {
 
 	emailService := service.NewEmailService(config, emailApiKey)
 
-	authService := service.NewAuthService(authRepository, encryptionKey, emailService)
+	authService := service.NewAuthService(authRepository, config, emailService, encryptionKey)
 
 	authHandler := handlers.NewAuthHandler(authService)
 
 	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
 	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
+	http.HandleFunc("/authapi/user/email/verify", authHandler.HandleUserEmailVerification)
 	http.HandleFunc("/authapi/user/email", authHandler.HandleUserEmailChange)
 	http.HandleFunc("/authapi/user/password", authHandler.HandleUserPasswordChange)
 	http.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
@@ -62,7 +63,7 @@ func init() {
 }
 
 func main() {
-	port := os.Getenv("AUTH_PORT")
+	port := os.Getenv("A3N_PORT")
 	if port == "" {
 		port = "3001"
 	}

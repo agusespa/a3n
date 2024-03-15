@@ -9,11 +9,11 @@ import (
 
 func ConnectDB(config models.Config, password string) (*sql.DB, error) {
 	cfg := mysql.Config{
-		User:      config.DBUser,
+		User:      config.Database.User,
 		Passwd:    password,
 		Net:       "tcp",
-		Addr:      config.DBAddr,
-		DBName:    config.DBName,
+		Addr:      config.Database.Address,
+		DBName:    config.Database.Name,
 		ParseTime: true,
 	}
 
