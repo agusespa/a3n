@@ -9,16 +9,16 @@ import (
 )
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
+	log.Printf("error: %v", err.Error())
+
 	if customErr, ok := err.(*httperrors.Error); ok {
 		http.Error(w, customErr.Message(), customErr.Status())
 	} else {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
-
-	log.Printf("error: %v", err.Error())
 }
 
-func Write(w http.ResponseWriter, r *http.Request, payload interface{}) {
+func Write(w http.ResponseWriter, r *http.Request, payload any) {
 	if payload == nil {
 		w.WriteHeader(http.StatusOK)
 		return

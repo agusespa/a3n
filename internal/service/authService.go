@@ -62,12 +62,14 @@ func (as *AuthService) RegisterNewUser(body models.UserRequest) (int64, error) {
 		return 0, err
 	}
 
-	verificationEmail, err := as.BuildVerificationEmail(body.FirstName, body.LastName, body.Email)
-	if err != nil {
-		log.Printf("error: %v", err.Error())
-	} else {
-		as.EmailSrv.SendEmail(verificationEmail)
-	}
+	go func() {
+		verificationEmail, err := as.BuildVerificationEmail(body.FirstName, body.LastName, body.Email)
+		if err != nil {
+			log.Printf("error: %v", err.Error())
+		} else {
+			as.EmailSrv.SendEmail(verificationEmail)
+		}
+	}()
 
 	return id, nil
 }
@@ -149,12 +151,14 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 	}
 
 	if !userData.EmailVerified {
-		verificationEmail, err := as.BuildVerificationEmail(userData.FirstName, userData.LastName, userData.Email)
-		if err != nil {
-			log.Printf("error: %v", err.Error())
-		} else {
-			as.EmailSrv.SendEmail(verificationEmail)
-		}
+		go func() {
+			verificationEmail, err := as.BuildVerificationEmail(userData.FirstName, userData.LastName, userData.Email)
+			if err != nil {
+				log.Printf("error: %v", err.Error())
+			} else {
+				as.EmailSrv.SendEmail(verificationEmail)
+			}
+		}()
 		if as.HardVerify {
 			customError := errors.New("email verification required")
 			err := httperrors.NewError(customError, http.StatusForbidden)
@@ -242,7 +246,7 @@ func (as *AuthService) ValidateToken(token string) (*models.CustomClaims, error)
 	parsedToken, err := jwt.ParseWithClaims(
 		token,
 		&models.CustomClaims{},
-		func(token *jwt.Token) (interface{}, error) {
+		func(token *jwt.Token) (any, error) {
 			return as.EncryptionKey, nil
 		},
 	)

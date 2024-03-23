@@ -18,11 +18,11 @@ func NewAuthRepository(db *sql.DB) *AuthRepository {
 }
 
 func (repo *AuthRepository) CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error) {
-	var middleName interface{}
+	var middleName *string
 	if body.MiddleName == "" {
 		middleName = nil
 	} else {
-		middleName = body.MiddleName
+		middleName = &body.MiddleName
 	}
 	result, err := repo.DB.Exec("INSERT INTO users (user_uuid, first_name, middle_name, last_name, email, password_hash) VALUES (?, ?, ?, ?, ?, ?)", uuid, body.FirstName, middleName, body.LastName, body.Email, passwordHash)
 	if err != nil {
