@@ -8,3 +8,4 @@ set -e
 
 # golangci-lint run || (echo "ERROR Lint failed" && exit 1)
 make build || (echo "ERROR Build failed" && exit 1)
+exit 1;
