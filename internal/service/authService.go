@@ -22,7 +22,7 @@ import (
 )
 
 type AuthService struct {
-	// AuthRepo        *repository.AuthRepository
+	AuthRepo        *repository.AuthRepository
 	EncryptionKey   []byte
 	RefreshTokenExp int
 	AccessTokenExp  int
