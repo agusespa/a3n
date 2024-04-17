@@ -8,8 +8,8 @@
     "name": "auth"
   },
   "token": {
-      "refreshExp": 10,
-      "accessExp": 5
+    "refreshExp": 10,
+    "accessExp": 5
   },
   "email": {
     "provider": "sendgrid",
