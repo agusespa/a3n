@@ -10,7 +10,9 @@ staged_files=$(git diff --cached --name-only --diff-filter=ACM -- './**/*')
 
 if [ -n "$staged_files" ]; then
     go_files=$(echo "$staged_files" | grep -E '\.go' || true)
+    echo "$go_files"
     if [ -n "$go_files" ]; then
+        echo "$go_files"
         golangci-lint run $go_files || (echo "ERROR Lint failed" && exit 1)
     fi
 fi

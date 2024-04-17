@@ -6,10 +6,4 @@ echo "╚═══════════════════════�
 
 set -e
 
-cd ./module
-
-npm run lint-quiet || (echo "ERROR: Lint failed" && exit 1)
-
-npm run test || (echo "ERROR: Tests failed" && exit 1)
-
-tsc --noemit || (echo "ERROR: Type check failed" && exit 1)
+golangci-lint run || (echo "ERROR Lint failed" && exit 1)
