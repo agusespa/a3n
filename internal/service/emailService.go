@@ -19,7 +19,7 @@ func NewEmailService(config models.Config, key string) *EmailService {
 	return &EmailService{Provider: config.Email.Provider, ApiKey: key, SenderName: config.Email.Sender.Name, SenderAddr: config.Email.Sender.Address}
 }
 
-func (es *EmailService) SendEmail(email *mail.SGMailV3) error {
+func (es *EmailService) SendEmail(email *mail.SGMailV3) {
 	client := sendgrid.NewSendClient(es.ApiKey)
 	response, err := client.Send(email)
 	// TODO: handle error logs better?
@@ -27,7 +27,6 @@ func (es *EmailService) SendEmail(email *mail.SGMailV3) error {
 		log.Printf("email error: %v", err.Error())
 	}
 	log.Printf("email response: %v", response)
-	return err
 }
 
 func (es *EmailService) BuildEmail(toName, toAddr, subject, body, template string) *mail.SGMailV3 {
