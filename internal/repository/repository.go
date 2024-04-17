@@ -43,7 +43,7 @@ func (repo *AuthRepository) CreateUser(uuid string, body models.UserRequest, pas
 	return id, nil
 }
 
-func (repo *AuthRepository) QueryUserByEmail(email string) (models.UserAuthEntity, error) {
+func (repo *AuthRepository) ReadUserByEmail(email string) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
 
 	row := repo.DB.QueryRow("SELECT * FROM users WHERE email=?", email)
@@ -60,7 +60,7 @@ func (repo *AuthRepository) QueryUserByEmail(email string) (models.UserAuthEntit
 	return user, nil
 }
 
-func (repo *AuthRepository) QueryUserById(userID int64) (models.UserAuthEntity, error) {
+func (repo *AuthRepository) ReadUserById(userID int64) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
 
 	row := repo.DB.QueryRow("SELECT * FROM users WHERE user_id=?", userID)
@@ -144,7 +144,7 @@ func (repo *AuthRepository) UpdateUserPassword(userID int64, hashedPassword *[]b
 	return userID, nil
 }
 
-func (repo *AuthRepository) QueryUserByToken(tokenHash []byte) (models.UserAuthEntity, error) {
+func (repo *AuthRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
 
 	query := `
@@ -185,7 +185,7 @@ func (repo *AuthRepository) DeleteTokenByHash(tokenHash []byte) error {
 	return nil
 }
 
-func (repo *AuthRepository) DeleteUserTokensById(userID int64) error {
+func (repo *AuthRepository) DeleteAllTokensByUserId(userID int64) error {
 	_, err := repo.DB.Exec("DELETE FROM tokens WHERE user_id = ?", userID)
 	if err != nil {
 		err := httperrors.NewError(err, http.StatusInternalServerError)

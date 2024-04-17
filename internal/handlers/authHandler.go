@@ -34,7 +34,7 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	id, err := h.AuthService.RegisterNewUser(userReq)
+	id, err := h.AuthService.PostUser(userReq)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -74,7 +74,7 @@ func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	id, err := h.AuthService.EditUserEmail(username, password, authReq.Email)
+	id, err := h.AuthService.PutUserEmail(username, password, authReq.Email)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -114,7 +114,7 @@ func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	id, err := h.AuthService.EditUserPassword(username, password, authReq.Password)
+	id, err := h.AuthService.PutUserPassword(username, password, authReq.Password)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -147,7 +147,7 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authData, err := h.AuthService.LoginUser(username, password)
+	authData, err := h.AuthService.GetUserLogin(username, password)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -179,7 +179,7 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 
 	bearerToken := strings.Split(authHeader, " ")[1]
 
-	accessToken, err := h.AuthService.RefreshToken(bearerToken)
+	accessToken, err := h.AuthService.GetRefreshToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -218,7 +218,7 @@ func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http
 		payload.WriteError(w, r, err)
 	}
 
-	err = h.AuthService.EditUserEmailVerification(claims.Email)
+	err = h.AuthService.PutUserEmailVerification(claims.Email)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -300,7 +300,7 @@ func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Reque
 
 	bearerToken := strings.Split(authHeader, " ")[1]
 
-	err := h.AuthService.RevoqueToken(bearerToken)
+	err := h.AuthService.DeleteToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -325,7 +325,7 @@ func (h *AuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.
 
 	bearerToken := strings.Split(authHeader, " ")[1]
 
-	err := h.AuthService.RevoqueUserTokens(bearerToken)
+	err := h.AuthService.DeleteAllTokens(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return

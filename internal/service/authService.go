@@ -35,7 +35,7 @@ func NewAuthService(authRepo *repository.AuthRepository, config models.Config, e
 	return &AuthService{AuthRepo: authRepo, EncryptionKey: []byte(encryptionKey), RefreshTokenExp: config.Token.RefreshExp, AccessTokenExp: config.Token.AccessExp, EmailSrv: emailSrv, ClientDomain: config.Client.Domain, HardVerify: config.Email.HardVerify}
 }
 
-func (as *AuthService) RegisterNewUser(body models.UserRequest) (int64, error) {
+func (as *AuthService) PostUser(body models.UserRequest) (int64, error) {
 	if !isValidEmail(body.Email) {
 		err := httperrors.NewError(errors.New("not a valid email address"), http.StatusBadRequest)
 		return 0, err
@@ -91,18 +91,18 @@ func (as *AuthService) BuildVerificationEmail(firstName, lastName, email string)
 	return as.EmailSrv.BuildEmail(fullName, email, subject, message, template), nil
 }
 
-func (as *AuthService) EditUserEmailVerification(email string) error {
+func (as *AuthService) PutUserEmailVerification(email string) error {
 	err := as.AuthRepo.UpdateUserEmailVerification(email)
 	return err
 }
 
-func (as *AuthService) EditUserEmail(username, password, newEmail string) (int64, error) {
+func (as *AuthService) PutUserEmail(username, password, newEmail string) (int64, error) {
 	if !isValidEmail(newEmail) {
 		err := httperrors.NewError(errors.New("not a valid email address"), http.StatusBadRequest)
 		return 0, err
 	}
 
-	userData, err := as.AuthRepo.QueryUserByEmail(username)
+	userData, err := as.AuthRepo.ReadUserByEmail(username)
 	if err != nil {
 		return 0, err
 	}
@@ -116,13 +116,13 @@ func (as *AuthService) EditUserEmail(username, password, newEmail string) (int64
 	return id, err
 }
 
-func (as *AuthService) EditUserPassword(username, password, newPassword string) (int64, error) {
+func (as *AuthService) PutUserPassword(username, password, newPassword string) (int64, error) {
 	if !isValidPassword(newPassword) {
 		err := httperrors.NewError(errors.New("password doesn't meet minimum criteria"), http.StatusBadRequest)
 		return 0, err
 	}
 
-	userData, err := as.AuthRepo.QueryUserByEmail(username)
+	userData, err := as.AuthRepo.ReadUserByEmail(username)
 	if err != nil {
 		return 0, err
 	}
@@ -142,10 +142,10 @@ func (as *AuthService) EditUserPassword(username, password, newPassword string) 
 	return id, err
 }
 
-func (as *AuthService) LoginUser(username, password string) (models.UserAuthData, error) {
+func (as *AuthService) GetUserLogin(username, password string) (models.UserAuthData, error) {
 	var userAuthData models.UserAuthData
 
-	userData, err := as.AuthRepo.QueryUserByEmail(username)
+	userData, err := as.AuthRepo.ReadUserByEmail(username)
 	if err != nil {
 		return userAuthData, err
 	}
@@ -193,13 +193,13 @@ func (as *AuthService) LoginUser(username, password string) (models.UserAuthData
 	return userAuthData, err
 }
 
-func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
+func (as *AuthService) GetRefreshToken(refreshToken string) (string, error) {
 
 	refreshTokenHash, err := hashRefreshToken(refreshToken)
 	if err != nil {
 		return "", err
 	}
-	userData, err := as.AuthRepo.QueryUserByToken(refreshTokenHash)
+	userData, err := as.AuthRepo.ReadUserByToken(refreshTokenHash)
 	if err != nil {
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return "", err
@@ -213,7 +213,7 @@ func (as *AuthService) RefreshToken(refreshToken string) (string, error) {
 	return accessToken, nil
 }
 
-func (as *AuthService) RevoqueToken(refreshToken string) error {
+func (as *AuthService) DeleteToken(refreshToken string) error {
 	refreshTokenHash, err := hashRefreshToken(refreshToken)
 	if err != nil {
 		return err
@@ -225,17 +225,17 @@ func (as *AuthService) RevoqueToken(refreshToken string) error {
 	return nil
 }
 
-func (as *AuthService) RevoqueUserTokens(refreshToken string) error {
+func (as *AuthService) DeleteAllTokens(refreshToken string) error {
 	refreshTokenHash, err := hashRefreshToken(refreshToken)
 	if err != nil {
 		return err
 	}
-	userData, err := as.AuthRepo.QueryUserByToken(refreshTokenHash)
+	userData, err := as.AuthRepo.ReadUserByToken(refreshTokenHash)
 	if err != nil {
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return err
 	}
-	if err := as.AuthRepo.DeleteUserTokensById(userData.UserID); err != nil {
+	if err := as.AuthRepo.DeleteAllTokensByUserId(userData.UserID); err != nil {
 		return err
 	}
 
