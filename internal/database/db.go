@@ -7,7 +7,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
-func ConnectDB(config models.Config, password string) (*sql.DB, error) {
+func ConnectDB(config models.ApiConfig, password string) (*sql.DB, error) {
 	cfg := mysql.Config{
 		User:      config.Database.User,
 		Passwd:    password,

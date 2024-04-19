@@ -27,12 +27,11 @@ type AuthService struct {
 	RefreshTokenExp int
 	AccessTokenExp  int
 	EmailSrv        *EmailService
-	ClientDomain    string
 	HardVerify      bool
 }
 
-func NewAuthService(authRepo *repository.AuthRepository, config models.Config, emailSrv *EmailService, encryptionKey string) *AuthService {
-	return &AuthService{AuthRepo: authRepo, EncryptionKey: []byte(encryptionKey), RefreshTokenExp: config.Token.RefreshExp, AccessTokenExp: config.Token.AccessExp, EmailSrv: emailSrv, ClientDomain: config.Client.Domain, HardVerify: config.Email.HardVerify}
+func NewAuthService(authRepo *repository.AuthRepository, config models.ApiConfig, emailSrv *EmailService, encryptionKey string) *AuthService {
+	return &AuthService{AuthRepo: authRepo, EncryptionKey: []byte(encryptionKey), RefreshTokenExp: config.Token.RefreshExp, AccessTokenExp: config.Token.AccessExp, EmailSrv: emailSrv, HardVerify: config.Email.HardVerify}
 }
 
 func (as *AuthService) PostUser(body models.UserRequest) (int64, error) {
@@ -75,20 +74,13 @@ func (as *AuthService) PostUser(body models.UserRequest) (int64, error) {
 }
 
 func (as *AuthService) BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error) {
-	fullName := firstName + " " + lastName
-	subject := "Verify address"
-
 	token, err := as.generateEmailVerifyJWT(email)
 	if err != nil {
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return nil, err
 	}
 
-	link := as.ClientDomain + "/verify/" + token
-	message := "Follow this link to verify your email address: " + link
-	template := "<p>Follow this link to verify your email address:&nbsp;</p><a>" + link + "</a>"
-
-	return as.EmailSrv.BuildEmail(fullName, email, subject, message, template), nil
+	return as.EmailSrv.BuildVerificationEmail(firstName, lastName, email, token), nil
 }
 
 func (as *AuthService) PutUserEmailVerification(email string) error {

@@ -1,6 +1,11 @@
 package models
 
 type Config struct {
+	Api      ApiConfig      `json:"api"`
+	Branding BrandingConfig `json:"branding"`
+}
+
+type ApiConfig struct {
 	Client   Client   `json:"client"`
 	Database Database `json:"database"`
 	Token    Token    `json:"token"`
@@ -31,4 +36,17 @@ type Email struct {
 type Sender struct {
 	Address string `json:"address"`
 	Name    string `json:"name"`
+}
+
+type BrandingConfig struct {
+	Logo   string      `json:"logoUrl"`
+	Colors ColorScheme `json:"colorScheme"`
+}
+
+type ColorScheme struct {
+	Primary    string `json:"primary"`
+	Secondary  string `json:"secondary"`
+	Background string `json:"background"`
+	Font       string `json:"font"`
+	Link       string `json:"link"`
 }

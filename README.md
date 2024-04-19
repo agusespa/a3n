@@ -13,19 +13,21 @@ The following secrets must be provided as environment variables:
 - "A3N_EMAIL_API_KEY" for the email service api key
 
 ## Branding
-Use the `config/branding.json` file to provide custom colors for the emails and the web client. Add a custom property with the new values to override the defaults:
+Use the `config/branding.json` file to provide custom colors for the emails and the web client. Add a `custom` property with the new values to override the defaults:
 ```json
 {
-  "default": {
-    "colors": {
-      "background": "#FFFFFF"
-    }
-  },
-  "custom": {
-    "colors": {
-      "background": "#"
-    }
-  }
+    "default": {
+        "colors": {
+            "primary": "#6F826F",
+                "background": "#595959",
+                "font": "#FFFFFF"
+        }
+    },
+        "custom": {
+            "colors": {
+                "background": "#"
+            }
+        }
 }
 ```
 To use a custom logo, place it in the `config/asset` directory. It must be a png file named 'logo.png', with dimentions 500px by 500px.

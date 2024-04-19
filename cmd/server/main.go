@@ -14,17 +14,6 @@ import (
 )
 
 func init() {
-	configFile, err := os.ReadFile("config.json")
-	if err != nil {
-		log.Fatalf("Error reading config file: %v", err)
-	}
-	var config models.Config
-	err = json.Unmarshal(configFile, &config)
-	if err != nil {
-		log.Fatalf("Error parsing config file: %v", err)
-		return
-	}
-
 	encryptionKey := os.Getenv("A3N_ENCRYPTION_KEY")
 	if encryptionKey == "" {
 		log.Fatal("Error getting ENCRYPTION_KEY variable")
@@ -38,7 +27,18 @@ func init() {
 		log.Fatal("Error getting EMAIL_API_KEY variable")
 	}
 
-	db, err := database.ConnectDB(config, dbPassword)
+	configFile, err := os.ReadFile("config/config.json")
+	if err != nil {
+		log.Fatalf("Error reading api config file: %v", err)
+	}
+	var config models.Config
+	err = json.Unmarshal(configFile, &config)
+	if err != nil {
+		log.Fatalf("Error parsing api config file: %v", err)
+		return
+	}
+
+	db, err := database.ConnectDB(config.Api, dbPassword)
 	if err != nil {
 		log.Fatalf("Error establishing database connection: %v", err)
 	}
@@ -47,7 +47,7 @@ func init() {
 
 	emailService := service.NewEmailService(config, emailApiKey)
 
-	authService := service.NewAuthService(authRepository, config, emailService, encryptionKey)
+	authService := service.NewAuthService(authRepository, config.Api, emailService, encryptionKey)
 
 	authHandler := handlers.NewAuthHandler(authService)
 
