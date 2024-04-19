@@ -1,0 +1,34 @@
+{
+  "api": {
+    "client": {
+      "domain": "http://localhost:3000"
+    },
+    "database": {
+      "user": "root",
+      "address": "localhost:3306",
+      "name": "auth"
+    },
+    "token": {
+      "refreshExp": 10,
+      "accessExp": 5
+    },
+    "email": {
+      "provider": "sendgrid",
+      "sender": {
+        "address": "agustinespania@gmail.com",
+        "name": "eCom"
+      },
+      "hardVerify": true
+    }
+  },
+  "branding": {
+    "logoUrl": "https://github.com/agusespa/a3n/blob/main/config/assets/logo.png?raw=true",
+    "colorScheme": {
+      "primary": "#FADE84",
+      "secondary": "#6F826F",
+      "background": "#6F826F",
+      "font": "#FFFFFF",
+      "link": "#FADE84"
+    }
+  }
+}

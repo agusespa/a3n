@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Email Verification</title>
+    </head>
+    <body>
+        <div
+            class="container"
+            style="font-family: Arial, sans-serif; padding: 20px; background-color: {{ .BackgroundColor }};"
+        >
+            <img
+                src="{{ .Logo }}"
+                alt="Brand Icon"
+                class="icon"
+                style="
+                    display: block;
+                    margin: 0 auto 20px auto;
+                    width: 100px;
+                    height: auto;
+                "
+            />
+            <p style="color: {{ .FontColor }}">
+                Follow this link to verify your email address:
+            </p>
+            <a
+                href="{{ .Link }}"
+                class="link"
+                style="color: {{ .LinkColor }}; text-decoration: none;"
+                >{{ .Link }}</a
+            >
+        </div>
+    </body>
+</html>
