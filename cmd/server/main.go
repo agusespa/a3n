@@ -16,31 +16,31 @@ import (
 func init() {
 	encryptionKey := os.Getenv("A3N_ENCRYPTION_KEY")
 	if encryptionKey == "" {
-		log.Fatal("Error getting ENCRYPTION_KEY variable")
+		log.Fatal("ERROR faild to get ENCRYPTION_KEY variable")
 	}
 	dbPassword := os.Getenv("A3N_DB_PASSWORD")
 	if dbPassword == "" {
-		log.Fatal("Error getting DB_PASSWORD variable")
+		log.Fatal("ERROR failed to get DB_PASSWORD variable")
 	}
 	emailApiKey := os.Getenv("A3N_EMAIL_API_KEY")
 	if emailApiKey == "" {
-		log.Fatal("Error getting EMAIL_API_KEY variable")
+		log.Fatal("ERROR failed to get EMAIL_API_KEY variable")
 	}
 
 	configFile, err := os.ReadFile("config/config.json")
 	if err != nil {
-		log.Fatalf("Error reading api config file: %v", err)
+		log.Fatalf("ERROR failed to read config file: %v", err)
 	}
 	var config models.Config
 	err = json.Unmarshal(configFile, &config)
 	if err != nil {
-		log.Fatalf("Error parsing api config file: %v", err)
+		log.Fatalf("ERROR failed to parse config file: %v", err)
 		return
 	}
 
 	db, err := database.ConnectDB(config.Api, dbPassword)
 	if err != nil {
-		log.Fatalf("Error establishing database connection: %v", err)
+		log.Fatalf("ERROR failed to establish database connection: %v", err)
 	}
 
 	authRepository := repository.NewAuthRepository(db)
@@ -67,10 +67,10 @@ func main() {
 	if port == "" {
 		port = "3001"
 	}
-	log.Printf("Listening on port %v", port)
+	log.Printf("INFO Listening on port %v", port)
 
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
-		log.Fatalf("Error starting the HTTP server: %v", err)
+		log.Fatalf("ERROR failed to start HTTP server: %v", err)
 	}
 }

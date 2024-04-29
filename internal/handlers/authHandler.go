@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/base64"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -22,6 +23,7 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 
 func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		log.Printf("ERROR method not allowed")
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -29,6 +31,7 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 
 	var userReq models.UserRequest
 	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
+		log.Printf("ERROR %v", err.Error())
 		err := httperrors.NewError(err, http.StatusBadRequest)
 		payload.WriteError(w, r, err)
 		return
@@ -49,6 +52,7 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 
 func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
+		log.Printf("ERROR method not allowed")
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -56,6 +60,7 @@ func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Reque
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
+		log.Printf("ERROR no bearer token")
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
@@ -69,6 +74,7 @@ func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Reque
 
 	var authReq models.AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
+		log.Printf("ERROR malformed token")
 		err := httperrors.NewError(err, http.StatusBadRequest)
 		payload.WriteError(w, r, err)
 		return
@@ -89,6 +95,7 @@ func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Reque
 
 func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
+		log.Printf("ERROR method not allowed")
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -97,6 +104,7 @@ func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Re
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		log.Printf("ERROR missing authorization header")
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -110,6 +118,7 @@ func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Re
 	var authReq models.AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
 		err := httperrors.NewError(err, http.StatusBadRequest)
+		log.Printf("ERROR %v", err.Error())
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -129,6 +138,7 @@ func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Re
 
 func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		log.Printf("ERROR method not allowed")
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -137,6 +147,7 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		log.Printf("ERROR missing authorization header")
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -165,6 +176,7 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		log.Printf("ERROR method not allowed")
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -173,6 +185,7 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		log.Printf("ERROR missing authorization header")
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -194,6 +207,7 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 
 func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
+		log.Printf("ERROR method not allowed")
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -202,6 +216,7 @@ func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		log.Printf("ERROR missing authorization header")
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -215,6 +230,7 @@ func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http
 
 	if claims.Type != "email_verify" {
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		log.Printf("ERROR invalid jwt claim")
 		payload.WriteError(w, r, err)
 	}
 
@@ -229,6 +245,7 @@ func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http
 
 func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		log.Printf("ERROR method not allowed")
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -237,6 +254,7 @@ func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Re
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		log.Printf("ERROR missing authorization header")
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -250,6 +268,7 @@ func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Re
 
 	if claims.Type != "access" {
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		log.Printf("ERROR invalid jwt claim")
 		payload.WriteError(w, r, err)
 	}
 
@@ -263,6 +282,7 @@ func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Re
 func extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
 	if !strings.HasPrefix(authHeader, "Basic ") {
 		err = httperrors.NewError(nil, http.StatusBadRequest)
+		log.Printf("ERROR missing credentials")
 		return "", "", err
 	}
 
@@ -270,11 +290,13 @@ func extractBasicAuthCredentials(authHeader string) (username, password string, 
 	credsentialsDecoded, err := base64.StdEncoding.DecodeString(credentialsEncoded)
 	if err != nil {
 		err = httperrors.NewError(nil, http.StatusBadRequest)
+		log.Printf("ERROR failed to decode basic credentials")
 		return "", "", err
 	}
 
 	credentials := strings.SplitN(string(credsentialsDecoded), ":", 2)
 	if len(credentials) != 2 {
+		log.Printf("ERROR malformed credentials")
 		err = httperrors.NewError(nil, http.StatusBadRequest)
 		return "", "", err
 	}
@@ -286,6 +308,7 @@ func extractBasicAuthCredentials(authHeader string) (username, password string, 
 
 func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
+		log.Printf("ERROR method not allowed")
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -294,6 +317,7 @@ func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Reque
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		log.Printf("ERROR missing authorization header")
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -311,6 +335,7 @@ func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Reque
 
 func (h *AuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
+		log.Printf("ERROR method not allowed")
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -319,6 +344,7 @@ func (h *AuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		log.Printf("ERROR missing authorization header")
 		payload.WriteError(w, r, err)
 		return
 	}

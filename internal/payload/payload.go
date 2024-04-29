@@ -2,15 +2,12 @@ package payload
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/agusespa/a3n/internal/httperrors"
 )
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
-	log.Printf("error: %v", err.Error())
-
 	if customErr, ok := err.(*httperrors.Error); ok {
 		http.Error(w, customErr.Message(), customErr.Status())
 	} else {

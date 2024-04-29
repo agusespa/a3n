@@ -50,11 +50,11 @@ func NewEmailService(config models.Config, key string) *EmailService {
 func (es *EmailService) SendEmail(email *mail.SGMailV3) {
 	client := sendgrid.NewSendClient(es.ApiKey)
 	response, err := client.Send(email)
-	// TODO: handle logs better?
 	if err != nil {
-		log.Printf("email error: %v", err.Error())
+		log.Printf("ERROR failed to send email: %v", err.Error())
+	} else {
+		log.Printf("INFO email sent: %v", response)
 	}
-	log.Printf("email sent: %v", response)
 }
 
 func (es *EmailService) BuildVerificationEmail(firstName, lastName, toAddr, token string) *mail.SGMailV3 {
@@ -80,11 +80,11 @@ func (es *EmailService) BuildVerificationEmail(firstName, lastName, toAddr, toke
 		var body bytes.Buffer
 		err = tmpl.Execute(&body, content)
 		if err != nil {
-			log.Printf("email error: %v", err.Error())
+			log.Printf("WARN failed to generate custom html template: %v", err.Error())
 		}
 		emailTemplate = body.String()
 	} else {
-		log.Printf("email error: %v", err.Error())
+		log.Printf("WARN failed to parse html template: %v", err.Error())
 	}
 
 	from := mail.NewEmail(es.SenderName, es.SenderAddr)

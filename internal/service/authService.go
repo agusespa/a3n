@@ -37,14 +37,17 @@ func NewAuthService(authRepo *repository.AuthRepository, config models.ApiConfig
 func (as *AuthService) PostUser(body models.UserRequest) (int64, error) {
 	if !isValidEmail(body.Email) {
 		err := httperrors.NewError(errors.New("not a valid email address"), http.StatusBadRequest)
+		log.Printf("ERROR %v", err.Error())
 		return 0, err
 	}
 	if !isValidPassword(body.Password) {
 		err := httperrors.NewError(errors.New("password doesn't meet minimum criteria"), http.StatusBadRequest)
+		log.Printf("ERROR %v", err.Error())
 		return 0, err
 	}
 	if body.FirstName == "" || body.LastName == "" {
 		err := httperrors.NewError(errors.New("name not provided"), http.StatusBadRequest)
+		log.Printf("ERROR %v", err.Error())
 		return 0, err
 	}
 
@@ -52,20 +55,18 @@ func (as *AuthService) PostUser(body models.UserRequest) (int64, error) {
 
 	hashedPassword, err := hashPassword(body.Password)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}
 
 	id, err := as.AuthRepo.CreateUser(uuidStr, body, hashedPassword)
 	if err != nil {
+		log.Printf("ERROR %v", err.Error())
 		return 0, err
 	}
 
 	go func() {
 		verificationEmail, err := as.BuildVerificationEmail(body.FirstName, body.LastName, body.Email)
-		if err != nil {
-			log.Printf("error: %v", err.Error())
-		} else {
+		if err == nil {
 			as.EmailSrv.SendEmail(verificationEmail)
 		}
 	}()
@@ -76,7 +77,6 @@ func (as *AuthService) PostUser(body models.UserRequest) (int64, error) {
 func (as *AuthService) BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error) {
 	token, err := as.generateEmailVerifyJWT(email)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return nil, err
 	}
 
@@ -85,53 +85,71 @@ func (as *AuthService) BuildVerificationEmail(firstName, lastName, email string)
 
 func (as *AuthService) PutUserEmailVerification(email string) error {
 	err := as.AuthRepo.UpdateUserEmailVerification(email)
+	if err != nil {
+		log.Printf("ERROR %v", err.Error())
+	}
 	return err
 }
 
 func (as *AuthService) PutUserEmail(username, password, newEmail string) (int64, error) {
 	if !isValidEmail(newEmail) {
 		err := httperrors.NewError(errors.New("not a valid email address"), http.StatusBadRequest)
+		log.Printf("ERROR %v", err.Error())
 		return 0, err
 	}
 
 	userData, err := as.AuthRepo.ReadUserByEmail(username)
 	if err != nil {
+		log.Printf("ERROR %v", err.Error())
 		return 0, err
 	}
 
 	if err := verifyHashedPassword(userData.PasswordHash, password); err != nil {
+		log.Printf("ERROR %v", err.Error())
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return 0, err
 	}
 
 	id, err := as.AuthRepo.UpdateUserEmail(userData.UserID, newEmail)
-	return id, err
+	if err != nil {
+		log.Printf("ERROR %v", err.Error())
+		return 0, err
+	}
+
+	return id, nil
 }
 
 func (as *AuthService) PutUserPassword(username, password, newPassword string) (int64, error) {
 	if !isValidPassword(newPassword) {
 		err := httperrors.NewError(errors.New("password doesn't meet minimum criteria"), http.StatusBadRequest)
+		log.Printf("ERROR %v", err.Error())
 		return 0, err
 	}
 
 	userData, err := as.AuthRepo.ReadUserByEmail(username)
 	if err != nil {
+		log.Printf("ERROR %v", err.Error())
 		return 0, err
 	}
 
 	if err := verifyHashedPassword(userData.PasswordHash, password); err != nil {
+		log.Printf("ERROR %v", err.Error())
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return 0, err
 	}
 
 	hashedPassword, err := hashPassword(newPassword)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}
 
 	id, err := as.AuthRepo.UpdateUserPassword(userData.UserID, &hashedPassword)
-	return id, err
+	if err != nil {
+		log.Printf("ERROR %v", err.Error())
+		return 0, err
+	}
+
+	return id, nil
 }
 
 func (as *AuthService) GetUserLogin(username, password string) (models.UserAuthData, error) {
@@ -139,26 +157,26 @@ func (as *AuthService) GetUserLogin(username, password string) (models.UserAuthD
 
 	userData, err := as.AuthRepo.ReadUserByEmail(username)
 	if err != nil {
+		log.Printf("ERROR %v", err.Error())
 		return userAuthData, err
 	}
 
 	if !userData.EmailVerified {
 		go func() {
 			verificationEmail, err := as.BuildVerificationEmail(userData.FirstName, userData.LastName, userData.Email)
-			if err != nil {
-				log.Printf("error: %v", err.Error())
-			} else {
+			if err == nil {
 				as.EmailSrv.SendEmail(verificationEmail)
 			}
 		}()
 		if as.HardVerify {
-			customError := errors.New("email verification required")
-			err := httperrors.NewError(customError, http.StatusForbidden)
+			err := httperrors.NewError(errors.New("email verification required"), http.StatusForbidden)
+			log.Printf("ERROR %v", err.Error())
 			return userAuthData, err
 		}
 	}
 
 	if err := verifyHashedPassword(userData.PasswordHash, password); err != nil {
+		log.Printf("ERROR %v", err.Error())
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return userAuthData, err
 	}
@@ -173,6 +191,7 @@ func (as *AuthService) GetUserLogin(username, password string) (models.UserAuthD
 		return userAuthData, err
 	}
 	if err := as.AuthRepo.CreateRefreshToken(userData.UserID, refreshTokenHash); err != nil {
+		log.Printf("ERROR %v", err.Error())
 		return userAuthData, err
 	}
 
@@ -193,6 +212,7 @@ func (as *AuthService) GetRefreshToken(refreshToken string) (string, error) {
 	}
 	userData, err := as.AuthRepo.ReadUserByToken(refreshTokenHash)
 	if err != nil {
+		log.Printf("ERROR %v", err.Error())
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return "", err
 	}
@@ -211,6 +231,7 @@ func (as *AuthService) DeleteToken(refreshToken string) error {
 		return err
 	}
 	if err := as.AuthRepo.DeleteTokenByHash(refreshTokenHash); err != nil {
+		log.Printf("ERROR %v", err.Error())
 		return err
 	}
 
@@ -224,10 +245,11 @@ func (as *AuthService) DeleteAllTokens(refreshToken string) error {
 	}
 	userData, err := as.AuthRepo.ReadUserByToken(refreshTokenHash)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusUnauthorized)
+		log.Printf("ERROR %v", err.Error())
 		return err
 	}
 	if err := as.AuthRepo.DeleteAllTokensByUserId(userData.UserID); err != nil {
+		log.Printf("ERROR %v", err.Error())
 		return err
 	}
 
@@ -243,6 +265,7 @@ func (as *AuthService) ValidateToken(token string) (*models.CustomClaims, error)
 		},
 	)
 	if err != nil {
+		log.Printf("ERROR failed to parse jwt: %v", err.Error())
 		err := httperrors.NewError(err, http.StatusUnauthorized)
 		return &models.CustomClaims{}, err
 	}
@@ -250,6 +273,7 @@ func (as *AuthService) ValidateToken(token string) (*models.CustomClaims, error)
 	claims, ok := parsedToken.Claims.(*models.CustomClaims)
 	if !ok {
 		err := httperrors.NewError(errors.New("failed to parse token claims"), http.StatusUnauthorized)
+		log.Printf("ERROR %v", err.Error())
 		return &models.CustomClaims{}, err
 	}
 
@@ -270,6 +294,8 @@ func isValidPassword(password string) bool {
 func hashPassword(password string) ([]byte, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
+		log.Printf("ERROR failed to hash password: %v", err.Error())
+		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return nil, err
 	}
 
@@ -296,6 +322,7 @@ func (as *AuthService) generateAccessJWT(userID int64, userUUID string) (string,
 
 	tokenString, err := token.SignedString(as.EncryptionKey)
 	if err != nil {
+		log.Printf("ERROR failed to sign jwt: %v", err.Error())
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return "", err
 	}
@@ -307,6 +334,7 @@ func generateRefreshToken() (string, error) {
 	token := make([]byte, 96)
 	_, err := rand.Read(token)
 	if err != nil {
+		log.Printf("ERROR failed to read token: %v", err.Error())
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return "", err
 	}
@@ -318,6 +346,7 @@ func generateRefreshToken() (string, error) {
 func hashRefreshToken(token string) ([]byte, error) {
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
+		log.Printf("ERROR failed to decode token: %v", err.Error())
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return nil, err
 	}
@@ -341,6 +370,7 @@ func (as *AuthService) generateEmailVerifyJWT(email string) (string, error) {
 
 	tokenString, err := token.SignedString(as.EncryptionKey)
 	if err != nil {
+		log.Printf("ERROR failed to sign jwt: %v", err.Error())
 		err := httperrors.NewError(err, http.StatusInternalServerError)
 		return "", err
 	}
