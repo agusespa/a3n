@@ -25,6 +25,8 @@ func NewAuthHandler(authService *service.AuthService, logger *logger.Logger) *Au
 }
 
 func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodPost {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -54,6 +56,8 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodPut {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -98,6 +102,8 @@ func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodPut {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -142,6 +148,8 @@ func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Re
 }
 
 func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodGet {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -181,6 +189,8 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodGet {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -213,6 +223,8 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodPut {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -253,6 +265,8 @@ func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http
 }
 
 func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodGet {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -319,6 +333,8 @@ func (h *AuthHandler) extractBasicAuthCredentials(authHeader string) (username, 
 }
 
 func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodDelete {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -347,6 +363,8 @@ func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *AuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodDelete {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)

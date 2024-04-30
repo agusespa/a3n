@@ -57,7 +57,7 @@ func (es *EmailService) SendEmail(email *mail.SGMailV3) {
 		es.Logger.LogError(fmt.Errorf("failed to send email: %v", err.Error()))
 	} else {
 		es.Logger.LogInfo("email sent")
-		es.Logger.LogDebug(fmt.Sprintf("email response: %v", response))
+		es.Logger.LogDebug(fmt.Sprintf("email headers: %v", response))
 	}
 }
 
