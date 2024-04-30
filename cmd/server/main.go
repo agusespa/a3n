@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,42 +16,49 @@ import (
 	"github.com/agusespa/a3n/internal/service"
 )
 
+var logg *logger.Logger
+
 func init() {
+	var devFlag bool
+	flag.BoolVar(&devFlag, "dev", false, "enable development mode")
+	flag.Parse()
+	logg = logger.NewLogger(devFlag)
+
 	encryptionKey := os.Getenv("A3N_ENCRYPTION_KEY")
 	if encryptionKey == "" {
-		logger.LogFatal("ERROR faild to get ENCRYPTION_KEY variable")
+		logg.LogFatal(errors.New("failed to get ENCRYPTION_KEY variable"))
 	}
 	dbPassword := os.Getenv("A3N_DB_PASSWORD")
 	if dbPassword == "" {
-		logger.LogFatal("ERROR failed to get DB_PASSWORD variable")
+		logg.LogFatal(errors.New("failed to get DB_PASSWORD variable"))
 	}
 	emailApiKey := os.Getenv("A3N_EMAIL_API_KEY")
 	if emailApiKey == "" {
-		logger.LogFatal("ERROR failed to get EMAIL_API_KEY variable")
+		logg.LogFatal(errors.New("failed to get EMAIL_API_KEY variable"))
 	}
 
 	configFile, err := os.ReadFile("config/config.json")
 	if err != nil {
-		logger.LogFatal(fmt.Sprintf("failed to read config file: %s", err.Error()))
+		logg.LogFatal(err)
 	}
 	var config models.Config
 	err = json.Unmarshal(configFile, &config)
 	if err != nil {
-		logger.LogFatal(fmt.Sprintf("failed to parse config file: %s", err.Error()))
+		logg.LogFatal(err)
 	}
 
 	db, err := database.ConnectDB(config.Api, dbPassword)
 	if err != nil {
-		logger.LogFatal(fmt.Sprintf("failed to establish database connection: %s", err.Error()))
+		logg.LogFatal(fmt.Errorf("failed to establish database connection: %s", err.Error()))
 	}
 
 	authRepository := repository.NewAuthRepository(db)
 
-	emailService := service.NewEmailService(config, emailApiKey)
+	emailService := service.NewEmailService(config, emailApiKey, logg)
 
-	authService := service.NewAuthService(authRepository, config.Api, emailService, encryptionKey)
+	authService := service.NewAuthService(authRepository, config.Api, emailService, encryptionKey, logg)
 
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, logg)
 
 	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
 	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
@@ -67,10 +76,11 @@ func main() {
 	if port == "" {
 		port = "3001"
 	}
-	logger.LogInfo(fmt.Sprintf("Listening on port %v", port))
+
+	logg.LogInfo(fmt.Sprintf("Listening on port %v", port))
 
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
-		logger.LogFatal(fmt.Sprintf("failed to start HTTP server: %s", err.Error()))
+		logg.LogFatal(errors.New(fmt.Sprintf("failed to start HTTP server: %s", err.Error())))
 	}
 }

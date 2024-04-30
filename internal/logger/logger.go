@@ -4,14 +4,35 @@ import (
 	"log"
 )
 
-func LogFatal(message string) {
-	log.Fatalf("FATAL ERROR %s", message)
+type Logger struct {
+	DevMode bool
 }
 
-func LogError(message string) {
-	log.Printf("ERROR %s", message)
+func NewLogger(devMode bool) *Logger {
+	if devMode {
+		log.Println("INFO running in development mode")
+	}
+	return &Logger{DevMode: devMode}
 }
 
-func LogInfo(message string) {
+func (l *Logger) LogFatal(err error) {
+	log.Fatalf("FATAL %s", err.Error())
+}
+
+func (l *Logger) LogError(err error) {
+	log.Printf("ERROR %s", err.Error())
+}
+
+func (l *Logger) LogWarn(message string) {
+	log.Printf("WARN %s", message)
+}
+
+func (l *Logger) LogInfo(message string) {
 	log.Printf("INFO %s", message)
+}
+
+func (l *Logger) LogDebug(message string) {
+	if l.DevMode {
+		log.Printf("DEBUG %s", message)
+	}
 }

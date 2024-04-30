@@ -2,9 +2,10 @@ package service
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
-	"log"
 
+	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
@@ -22,6 +23,7 @@ type EmailService struct {
 	FontColor       string
 	LinkColor       string
 	BackgroundColor string
+	Logger          *logger.Logger
 }
 
 type EmailContent struct {
@@ -32,7 +34,7 @@ type EmailContent struct {
 	LinkColor       string
 }
 
-func NewEmailService(config models.Config, key string) *EmailService {
+func NewEmailService(config models.Config, key string, logger *logger.Logger) *EmailService {
 	return &EmailService{
 		Provider:        config.Api.Email.Provider,
 		ApiKey:          key,
@@ -44,16 +46,18 @@ func NewEmailService(config models.Config, key string) *EmailService {
 		SecondaryColor:  config.Branding.Colors.Secondary,
 		FontColor:       config.Branding.Colors.Font,
 		LinkColor:       config.Branding.Colors.Link,
-		BackgroundColor: config.Branding.Colors.Background}
+		BackgroundColor: config.Branding.Colors.Background,
+		Logger:          logger}
 }
 
 func (es *EmailService) SendEmail(email *mail.SGMailV3) {
 	client := sendgrid.NewSendClient(es.ApiKey)
 	response, err := client.Send(email)
 	if err != nil {
-		log.Printf("ERROR failed to send email: %v", err.Error())
+		es.Logger.LogError(fmt.Errorf("failed to send email: %v", err.Error()))
 	} else {
-		log.Printf("INFO email sent: %v", response)
+		es.Logger.LogInfo("email sent")
+		es.Logger.LogDebug(fmt.Sprintf("email response: %v", response))
 	}
 }
 
@@ -80,11 +84,11 @@ func (es *EmailService) BuildVerificationEmail(firstName, lastName, toAddr, toke
 		var body bytes.Buffer
 		err = tmpl.Execute(&body, content)
 		if err != nil {
-			log.Printf("WARN failed to generate custom html template: %v", err.Error())
+			es.Logger.LogDebug(fmt.Sprintf("failed to generate custom html template: %v", err.Error()))
 		}
 		emailTemplate = body.String()
 	} else {
-		log.Printf("WARN failed to parse html template: %v", err.Error())
+		es.Logger.LogDebug(fmt.Sprintf("failed to parse html template: %v", err.Error()))
 	}
 
 	from := mail.NewEmail(es.SenderName, es.SenderAddr)
