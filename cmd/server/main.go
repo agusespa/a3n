@@ -81,6 +81,6 @@ func main() {
 
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
-		logg.LogFatal(errors.New(fmt.Sprintf("failed to start HTTP server: %s", err.Error())))
+		logg.LogFatal(fmt.Errorf("failed to start HTTP server: %s", err.Error()))
 	}
 }
