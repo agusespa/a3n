@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 
 	"github.com/agusespa/a3n/internal/database"
 	"github.com/agusespa/a3n/internal/handlers"
+	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/repository"
 	"github.com/agusespa/a3n/internal/service"
@@ -16,31 +17,30 @@ import (
 func init() {
 	encryptionKey := os.Getenv("A3N_ENCRYPTION_KEY")
 	if encryptionKey == "" {
-		log.Fatal("ERROR faild to get ENCRYPTION_KEY variable")
+		logger.LogFatal("ERROR faild to get ENCRYPTION_KEY variable")
 	}
 	dbPassword := os.Getenv("A3N_DB_PASSWORD")
 	if dbPassword == "" {
-		log.Fatal("ERROR failed to get DB_PASSWORD variable")
+		logger.LogFatal("ERROR failed to get DB_PASSWORD variable")
 	}
 	emailApiKey := os.Getenv("A3N_EMAIL_API_KEY")
 	if emailApiKey == "" {
-		log.Fatal("ERROR failed to get EMAIL_API_KEY variable")
+		logger.LogFatal("ERROR failed to get EMAIL_API_KEY variable")
 	}
 
 	configFile, err := os.ReadFile("config/config.json")
 	if err != nil {
-		log.Fatalf("ERROR failed to read config file: %v", err)
+		logger.LogFatal(fmt.Sprintf("failed to read config file: %s", err.Error()))
 	}
 	var config models.Config
 	err = json.Unmarshal(configFile, &config)
 	if err != nil {
-		log.Fatalf("ERROR failed to parse config file: %v", err)
-		return
+		logger.LogFatal(fmt.Sprintf("failed to parse config file: %s", err.Error()))
 	}
 
 	db, err := database.ConnectDB(config.Api, dbPassword)
 	if err != nil {
-		log.Fatalf("ERROR failed to establish database connection: %v", err)
+		logger.LogFatal(fmt.Sprintf("failed to establish database connection: %s", err.Error()))
 	}
 
 	authRepository := repository.NewAuthRepository(db)
@@ -67,10 +67,10 @@ func main() {
 	if port == "" {
 		port = "3001"
 	}
-	log.Printf("INFO Listening on port %v", port)
+	logger.LogInfo(fmt.Sprintf("Listening on port %v", port))
 
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
-		log.Fatalf("ERROR failed to start HTTP server: %v", err)
+		logger.LogFatal(fmt.Sprintf("failed to start HTTP server: %s", err.Error()))
 	}
 }
