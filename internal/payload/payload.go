@@ -2,6 +2,7 @@ package payload
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/agusespa/a3n/internal/httperrors"
@@ -26,8 +27,11 @@ func Write(w http.ResponseWriter, r *http.Request, payload any) {
 		WriteError(w, r, err)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(jsonBytes)))
 	w.WriteHeader(http.StatusOK)
+
 	if _, err := w.Write(jsonBytes); err != nil {
 		WriteError(w, r, err)
 		return

@@ -13,6 +13,7 @@ import (
 
 type Logger struct {
 	DevMode        bool
+	LogDir         string
 	CurrentLogFile *os.File
 	FileLog        *log.Logger
 }
@@ -22,16 +23,29 @@ func NewLogger(devMode bool) *Logger {
 		log.Println("INFO running in development mode")
 	}
 
-	var fileLogger *log.Logger
-	logFile, err := getUserLogFile()
+	currentUser, err := user.Current()
 	if err != nil {
-		message := fmt.Sprintf("FATAL error getting log file %s", err.Error())
+		message := fmt.Sprintf("FATAL failed getting the current os user: %s", err.Error())
+		log.Fatal(message)
+	}
+
+	homeDir := currentUser.HomeDir
+	logDir := filepath.Join(homeDir, ".a3n", "logs")
+	if err = os.MkdirAll(logDir, 0755); err != nil {
+		message := fmt.Sprintf("FATAL failed creating log directory: %s", err.Error())
+		log.Fatal(message)
+	}
+
+	var fileLogger *log.Logger
+	logFile, err := getUserLogFile(logDir)
+	if err != nil {
+		message := fmt.Sprintf("FATAL failed getting log file: %s", err.Error())
 		log.Fatal(message)
 	} else {
 		fileLogger = log.New(logFile, "", log.LstdFlags)
 	}
 
-	return &Logger{DevMode: devMode, CurrentLogFile: logFile, FileLog: fileLogger}
+	return &Logger{DevMode: devMode, LogDir: logDir, CurrentLogFile: logFile, FileLog: fileLogger}
 }
 
 func (l *Logger) LogFatal(err error) {
@@ -70,7 +84,7 @@ func (l *Logger) LogDebug(message string) {
 func (l *Logger) LogToFile(message string) {
 	err := l.refreshLogFile()
 	if err != nil {
-		message := fmt.Sprintf("FATAL error refreshing log file %s", err.Error())
+		message := fmt.Sprintf("FATAL failed refreshing log file: %s", err.Error())
 		log.Fatal(message)
 	}
 
@@ -81,18 +95,46 @@ func (l *Logger) LogToFile(message string) {
 	}
 }
 
-func getUserLogFile() (*os.File, error) {
-	currentUser, err := user.Current()
+func (l *Logger) refreshLogFile() error {
+	filename := filepath.Base(l.CurrentLogFile.Name())
+
+	now := time.Now()
+	y, m, d := now.Date()
+	date := fmt.Sprintf(`%d-%d-%d`, y, m, d)
+
+	var newFileName string
+	if !strings.HasPrefix(filename, date) {
+		newFileName = fmt.Sprintf(`%s_1.log`, date)
+	} else {
+		info, err := l.CurrentLogFile.Stat()
+		if err != nil {
+			return err
+		}
+
+		log.Printf("size: %d", info.Size())
+		if info.Size() < 10000000 {
+			return nil
+		}
+
+		oldName := filename[:len(filename)-4]
+		currNum := strings.Split(oldName, "_")[1]
+		num, err := strconv.Atoi(currNum)
+		if err != nil {
+			return err
+		}
+		newFileName = fmt.Sprintf(`%s_%d.log`, date, num+1)
+	}
+
+	logFile, err := os.OpenFile(filepath.Join(l.LogDir, newFileName), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	l.CurrentLogFile = logFile
+	l.FileLog = log.New(logFile, "", log.LstdFlags)
+	return nil
+}
 
-	homeDir := currentUser.HomeDir
-	logDir := filepath.Join(homeDir, ".a3n", "logs")
-	if err = os.MkdirAll(logDir, 0755); err != nil {
-		return nil, err
-	}
-
+func getUserLogFile(logDir string) (*os.File, error) {
 	files, err := os.ReadDir(logDir)
 	if err != nil {
 		return nil, err
@@ -133,56 +175,4 @@ func getUserLogFile() (*os.File, error) {
 	}
 
 	return logFile, nil
-}
-
-func (l *Logger) refreshLogFile() error {
-	filenamepath := l.CurrentLogFile.Name()
-	filename, path := getFilenameAndPath(filenamepath)
-
-	now := time.Now()
-	y, m, d := now.Date()
-	date := fmt.Sprintf(`%d-%d-%d`, y, m, d)
-
-	var newFileName string
-	if !strings.HasPrefix(filename, date) {
-		newFileName = fmt.Sprintf(`%s_1.log`, date)
-	} else {
-		info, err := l.CurrentLogFile.Stat()
-		if err != nil {
-			return err
-		}
-
-		if info.Size() < 10000000 {
-			return nil
-		}
-
-		oldName := filename[:len(filename)-4]
-		currNum := strings.Split(oldName, "_")[1]
-		num, err := strconv.Atoi(currNum)
-		if err != nil {
-			return err
-		}
-		newFileName = fmt.Sprintf(`%s_%d.log`, date, num+1)
-	}
-
-	logFile, err := os.OpenFile(filepath.Join(path, newFileName), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		return err
-	}
-	l.CurrentLogFile = logFile
-	l.FileLog = log.New(logFile, "", log.LstdFlags)
-	return nil
-}
-
-func getFilenameAndPath(path string) (string, string) {
-	index := -1
-	for i := 0; i < len(path); i++ {
-		if path[i] == '/' {
-			index = i
-		}
-	}
-	if index < 1 {
-		return "", path
-	}
-	return path[index+1:], path[:index]
 }
