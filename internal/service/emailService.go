@@ -12,8 +12,8 @@ import (
 )
 
 type EmailService struct {
-	Provider        string
-	ApiKey          string
+	Provider        string // TODO support more clients
+	Client          *sendgrid.Client
 	ClientDomain    string
 	SenderName      string
 	SenderAddr      string
@@ -37,7 +37,7 @@ type EmailContent struct {
 func NewEmailService(config models.Config, key string, logger *logger.Logger) *EmailService {
 	return &EmailService{
 		Provider:        config.Api.Email.Provider,
-		ApiKey:          key,
+		Client:          sendgrid.NewSendClient(key),
 		ClientDomain:    config.Api.Client.Domain,
 		SenderName:      config.Api.Email.Sender.Name,
 		SenderAddr:      config.Api.Email.Sender.Address,
@@ -51,8 +51,7 @@ func NewEmailService(config models.Config, key string, logger *logger.Logger) *E
 }
 
 func (es *EmailService) SendEmail(email *mail.SGMailV3) {
-	client := sendgrid.NewSendClient(es.ApiKey)
-	response, err := client.Send(email)
+	response, err := es.Client.Send(email)
 	if err != nil {
 		es.Logger.LogError(fmt.Errorf("failed to send email: %v", err.Error()))
 	} else {
