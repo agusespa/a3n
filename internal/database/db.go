@@ -2,22 +2,22 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/agusespa/a3n/internal/models"
-	"github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 )
 
-func ConnectDB(config models.ApiConfig, password string) (*sql.DB, error) {
-	cfg := mysql.Config{
-		User:      config.Database.User,
-		Passwd:    password,
-		Net:       "tcp",
-		Addr:      config.Database.Address,
-		DBName:    config.Database.Name,
-		ParseTime: true,
-	}
+func ConnectDB(config models.Database, password string) (*sql.DB, error) {
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		config.Address,
+		config.Port,
+		config.User,
+		password,
+		config.Name,
+	)
 
-	db, err := sql.Open("mysql", cfg.FormatDSN())
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
 	}

@@ -47,7 +47,7 @@ func init() {
 		logg.LogFatal(err)
 	}
 
-	db, err := database.ConnectDB(config.Api, dbPassword)
+	db, err := database.ConnectDB(config.Api.Database, dbPassword)
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to establish database connection: %s", err.Error()))
 	}
