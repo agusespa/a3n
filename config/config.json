@@ -4,8 +4,9 @@
       "domain": "http://localhost:3000"
     },
     "database": {
-      "user": "root",
-      "address": "localhost:3306",
+      "user": "postgres",
+      "address": "192.168.64.6",
+      "port": "5432",
       "name": "auth"
     },
     "token": {
