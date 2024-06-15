@@ -12,25 +12,67 @@ The following secrets must be provided as environment variables:
 - "A3N_DB_PASSWORD" for the database password
 - "A3N_EMAIL_API_KEY" for the email service api key
 
-## Branding
-Use the `config/branding.json` file to provide custom colors for the emails and the web client. Add a `custom` property with the new values to override the defaults:
+## Config
+The `config/config.json` file contains two objects:
+- `api` to provide variables
+- `branding` to provide customizations
 ```json
 {
-    "default": {
-        "colors": {
-            "primary": "#6F826F",
-                "background": "#595959",
-                "font": "#FFFFFF"
-        }
+    "api": {
     },
-        "custom": {
-            "colors": {
-                "background": "#"
-            }
-        }
+    "branding": {
+    }
 }
 ```
-To use a custom logo, place it in the `config/asset` directory. It must be a png file named 'logo.png', with dimentions 500px by 500px.
+### Api Vars
+Provide the following data inside the `api` object:
+- client domain for the email links and jwt subject:
+```json
+"client": {
+    "domain": "http://localhost:3000"
+},
+```
+- MySql connection:
+```json
+"database": {
+    "user": "root",
+    "address": "localhost:3306",
+    "name": "auth"
+},
+```
+- jwt access token settings:
+```json
+"token": {
+    "refreshExp": 10,
+    "accessExp": 5
+},
+```
+- email service vars (atm only sendgrid is supported):
+```json
+"email": {
+    "provider": "sendgrid",
+    "sender": {
+        "address": "agustinespania@gmail.com",
+        "name": "eCom"
+    },
+    "hardVerify": false
+}
+```
+### Branding
+Use the `branding` object to provide custom colors for the emails and the web client:
+```json
+"colorScheme": {
+    "primary": "#FADE84",
+    "secondary": "#6F826F",
+    "background": "#6F826F",
+    "font": "#FFFFFF",
+    "link": "#FADE84"
+}
+```
+To use a custom logo, provide the url to the file. It must be a png file named 'logo.png', with dimentions 500px by 500px.
+```json
+"logoUrl": "https://github.com/agusespa/a3n/blob/main/config/assets/logo.png?raw=true"
+```
 
 ---
 # Development
