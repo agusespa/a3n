@@ -24,19 +24,20 @@ func (repo *AuthRepository) CreateUser(uuid string, body models.UserRequest, pas
 	} else {
 		middleName = &body.MiddleName
 	}
+
 	result, err := repo.DB.Exec("INSERT INTO users (user_uuid, first_name, middle_name, last_name, email, password_hash) VALUES (?, ?, ?, ?, ?, ?)", uuid, body.FirstName, middleName, body.LastName, body.Email, passwordHash)
 	if err != nil {
 		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
-			err := httperrors.NewError(err, http.StatusConflict)
+			err = httperrors.NewError(err, http.StatusConflict)
 			return 0, err
 		}
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}
 
@@ -50,10 +51,10 @@ func (repo *AuthRepository) ReadUserByEmail(email string) (models.UserAuthEntity
 	err := row.Scan(&user.UserID, &user.UserUUID, &user.FirstName, &user.MiddleName, &user.LastName, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			err := httperrors.NewError(err, http.StatusNotFound)
+			err = httperrors.NewError(err, http.StatusNotFound)
 			return user, err
 		}
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return user, err
 	}
 
@@ -67,10 +68,10 @@ func (repo *AuthRepository) ReadUserById(userID int64) (models.UserAuthEntity, e
 	err := row.Scan(&user.UserID, &user.UserUUID, &user.FirstName, &user.MiddleName, &user.LastName, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			err := httperrors.NewError(err, http.StatusNotFound)
+			err = httperrors.NewError(err, http.StatusNotFound)
 			return user, err
 		}
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return user, err
 	}
 
@@ -80,18 +81,18 @@ func (repo *AuthRepository) ReadUserById(userID int64) (models.UserAuthEntity, e
 func (repo *AuthRepository) UpdateUserEmailVerification(email string) error {
 	result, err := repo.DB.Exec("UPDATE users SET email_verified = ? WHERE email = ?", true, email)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return err
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return err
 	}
 
 	if rowsAffected == 0 {
-		err := httperrors.NewError(err, http.StatusBadRequest)
+		err = httperrors.NewError(err, http.StatusBadRequest)
 		return err
 	}
 
@@ -102,21 +103,21 @@ func (repo *AuthRepository) UpdateUserEmail(userID int64, email string) (int64, 
 	result, err := repo.DB.Exec("UPDATE users SET email = ? WHERE user_id = ?", email, userID)
 	if err != nil {
 		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1064 {
-			err := httperrors.NewError(err, http.StatusBadRequest)
+			err = httperrors.NewError(err, http.StatusBadRequest)
 			return 0, err
 		}
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}
 
 	if rowsAffected == 0 {
-		err := httperrors.NewError(err, http.StatusBadRequest)
+		err = httperrors.NewError(err, http.StatusBadRequest)
 		return 0, err
 	}
 
@@ -126,18 +127,18 @@ func (repo *AuthRepository) UpdateUserEmail(userID int64, email string) (int64, 
 func (repo *AuthRepository) UpdateUserPassword(userID int64, hashedPassword *[]byte) (int64, error) {
 	result, err := repo.DB.Exec("UPDATE users SET password_hash = ? WHERE user_id = ?", *hashedPassword, userID)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return 0, err
 	}
 
 	if rowsAffected == 0 {
-		err := httperrors.NewError(err, http.StatusBadRequest)
+		err = httperrors.NewError(err, http.StatusBadRequest)
 		return 0, err
 	}
 
@@ -157,10 +158,10 @@ func (repo *AuthRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthEn
 	err := row.Scan(&user.UserID, &user.UserUUID, &user.FirstName, &user.MiddleName, &user.LastName, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			err := httperrors.NewError(err, http.StatusNotFound)
+			err = httperrors.NewError(err, http.StatusNotFound)
 			return user, err
 		}
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return user, err
 	}
 
@@ -170,7 +171,7 @@ func (repo *AuthRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthEn
 func (repo *AuthRepository) CreateRefreshToken(userID int64, tokenHash []byte) error {
 	_, err := repo.DB.Exec("INSERT INTO tokens (token_hash, user_id) VALUES (?, ?)", tokenHash, userID)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return err
 	}
 	return nil
@@ -179,7 +180,7 @@ func (repo *AuthRepository) CreateRefreshToken(userID int64, tokenHash []byte) e
 func (repo *AuthRepository) DeleteTokenByHash(tokenHash []byte) error {
 	_, err := repo.DB.Exec("DELETE FROM tokens WHERE token_hash = ?", tokenHash)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return err
 	}
 	return nil
@@ -188,7 +189,7 @@ func (repo *AuthRepository) DeleteTokenByHash(tokenHash []byte) error {
 func (repo *AuthRepository) DeleteAllTokensByUserId(userID int64) error {
 	_, err := repo.DB.Exec("DELETE FROM tokens WHERE user_id = ?", userID)
 	if err != nil {
-		err := httperrors.NewError(err, http.StatusInternalServerError)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return err
 	}
 	return nil

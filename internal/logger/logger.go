@@ -89,10 +89,6 @@ func (l *Logger) LogToFile(message string) {
 	}
 
 	l.FileLog.Println(message)
-
-	if l.DevMode {
-		log.Println(message)
-	}
 }
 
 func (l *Logger) refreshLogFile() error {
