@@ -19,7 +19,6 @@ type Client struct {
 type Database struct {
 	User    string `json:"user"`
 	Address string `json:"address"`
-	Port    string `json:"port"`
 	Name    string `json:"name"`
 }
 
