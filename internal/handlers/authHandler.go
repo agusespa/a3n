@@ -3,10 +3,13 @@ package handlers
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/agusespa/a3n/internal/httperrors"
+	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/payload"
 	"github.com/agusespa/a3n/internal/service"
@@ -14,14 +17,18 @@ import (
 
 type AuthHandler struct {
 	AuthService *service.AuthService
+	Logger      *logger.Logger
 }
 
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
-	return &AuthHandler{AuthService: authService}
+func NewAuthHandler(authService *service.AuthService, logger *logger.Logger) *AuthHandler {
+	return &AuthHandler{AuthService: authService, Logger: logger}
 }
 
 func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodPost {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -29,7 +36,8 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 
 	var userReq models.UserRequest
 	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
-		err := httperrors.NewError(err, http.StatusBadRequest)
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -48,7 +56,10 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodPut {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -56,12 +67,14 @@ func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Reque
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("no bearer token")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	username, password, err := extractBasicAuthCredentials(authHeader)
+	username, password, err := h.extractBasicAuthCredentials(authHeader)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -69,7 +82,8 @@ func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Reque
 
 	var authReq models.AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
-		err := httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusBadRequest)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -88,7 +102,10 @@ func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodPut {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -96,12 +113,14 @@ func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Re
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("missing authorization header")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	username, password, err := extractBasicAuthCredentials(authHeader)
+	username, password, err := h.extractBasicAuthCredentials(authHeader)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -109,7 +128,8 @@ func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Re
 
 	var authReq models.AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&authReq); err != nil {
-		err := httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusBadRequest)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -128,7 +148,10 @@ func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Re
 }
 
 func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodGet {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -136,12 +159,14 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("missing authorization header")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	username, password, err := extractBasicAuthCredentials(authHeader)
+	username, password, err := h.extractBasicAuthCredentials(authHeader)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -164,7 +189,10 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodGet {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -172,7 +200,9 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("missing authorization header")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -193,7 +223,10 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodPut {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -201,7 +234,9 @@ func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("missing authorization header")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -214,7 +249,9 @@ func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http
 	}
 
 	if claims.Type != "email_verify" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("invalid jwt claim")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 	}
 
@@ -228,7 +265,10 @@ func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http
 }
 
 func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodGet {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -236,7 +276,9 @@ func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Re
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("missing authorization header")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -249,7 +291,9 @@ func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Re
 	}
 
 	if claims.Type != "access" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("invalid jwt claim")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 	}
 
@@ -260,21 +304,25 @@ func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Re
 	payload.Write(w, r, res)
 }
 
-func extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
+func (h *AuthHandler) extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
 	if !strings.HasPrefix(authHeader, "Basic ") {
-		err = httperrors.NewError(nil, http.StatusBadRequest)
+		err := errors.New("missing credentials")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusBadRequest)
 		return "", "", err
 	}
 
 	credentialsEncoded := strings.TrimPrefix(authHeader, "Basic ")
 	credsentialsDecoded, err := base64.StdEncoding.DecodeString(credentialsEncoded)
 	if err != nil {
+		h.Logger.LogError(err)
 		err = httperrors.NewError(nil, http.StatusBadRequest)
 		return "", "", err
 	}
 
 	credentials := strings.SplitN(string(credsentialsDecoded), ":", 2)
 	if len(credentials) != 2 {
+		h.Logger.LogError(errors.New("malformed credentials"))
 		err = httperrors.NewError(nil, http.StatusBadRequest)
 		return "", "", err
 	}
@@ -285,7 +333,10 @@ func extractBasicAuthCredentials(authHeader string) (username, password string, 
 }
 
 func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodDelete {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -293,7 +344,9 @@ func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Reque
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("missing authorization header")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(nil, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -310,7 +363,10 @@ func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *AuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
 	if r.Method != http.MethodDelete {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
@@ -318,7 +374,9 @@ func (h *AuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := httperrors.NewError(nil, http.StatusUnauthorized)
+		err := errors.New("missing authorization header")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
