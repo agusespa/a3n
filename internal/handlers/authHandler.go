@@ -15,16 +15,28 @@ import (
 	"github.com/agusespa/a3n/internal/service"
 )
 
-type AuthHandler struct {
-	AuthService *service.AuthService
-	Logger      *logger.Logger
+type AuthHandler interface {
+	HandleUserRegister(w http.ResponseWriter, r *http.Request)
+	HandleUserEmailChange(w http.ResponseWriter, r *http.Request)
+	HandleUserPasswordChange(w http.ResponseWriter, r *http.Request)
+	HandleUserLogin(w http.ResponseWriter, r *http.Request)
+	HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
+	HandleUserEmailVerification(w http.ResponseWriter, r *http.Request)
+	HandleUserAuthentication(w http.ResponseWriter, r *http.Request)
+	HandleTokenRevocation(w http.ResponseWriter, r *http.Request)
+	HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request)
 }
 
-func NewAuthHandler(authService *service.AuthService, logger *logger.Logger) *AuthHandler {
-	return &AuthHandler{AuthService: authService, Logger: logger}
+type UserAuthHandler struct {
+	AuthService service.AuthService
+	Logger      logger.Logger
 }
 
-func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
+func NewAuthHandler(authService service.AuthService, logger logger.Logger) *UserAuthHandler {
+	return &UserAuthHandler{AuthService: authService, Logger: logger}
+}
+
+func (h *UserAuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPost {
@@ -55,7 +67,7 @@ func (h *AuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request)
 	payload.Write(w, r, res)
 }
 
-func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
+func (h *UserAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPut {
@@ -101,7 +113,7 @@ func (h *AuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Reque
 	payload.Write(w, r, res)
 }
 
-func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
+func (h *UserAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPut {
@@ -147,7 +159,7 @@ func (h *AuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Re
 	payload.Write(w, r, res)
 }
 
-func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
+func (h *UserAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -188,7 +200,7 @@ func (h *AuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 	payload.Write(w, r, res)
 }
 
-func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
+func (h *UserAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -222,7 +234,7 @@ func (h *AuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 	payload.Write(w, r, res)
 }
 
-func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
+func (h *UserAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPut {
@@ -264,7 +276,7 @@ func (h *AuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http
 	payload.Write(w, r, nil)
 }
 
-func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
+func (h *UserAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -304,7 +316,7 @@ func (h *AuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Re
 	payload.Write(w, r, res)
 }
 
-func (h *AuthHandler) extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
+func (h *UserAuthHandler) extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
 	if !strings.HasPrefix(authHeader, "Basic ") {
 		err := errors.New("missing credentials")
 		h.Logger.LogError(err)
@@ -332,7 +344,7 @@ func (h *AuthHandler) extractBasicAuthCredentials(authHeader string) (username, 
 	return
 }
 
-func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
+func (h *UserAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodDelete {
@@ -362,7 +374,7 @@ func (h *AuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Reque
 	payload.Write(w, r, "token successfully revoked")
 }
 
-func (h *AuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
+func (h *UserAuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodDelete {

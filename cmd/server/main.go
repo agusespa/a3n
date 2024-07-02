@@ -16,7 +16,7 @@ import (
 	"github.com/agusespa/a3n/internal/service"
 )
 
-var logg *logger.Logger
+var logg logger.Logger
 
 func init() {
 	var devFlag bool
