@@ -11,14 +11,22 @@ import (
 	"time"
 )
 
-type Logger struct {
+type Logger interface {
+	LogFatal(err error)
+	LogError(err error)
+	LogWarn(message string)
+	LogInfo(message string)
+	LogDebug(message string)
+}
+
+type FileLogger struct {
 	DevMode        bool
 	LogDir         string
 	CurrentLogFile *os.File
 	FileLog        *log.Logger
 }
 
-func NewLogger(devMode bool) *Logger {
+func NewLogger(devMode bool) *FileLogger {
 	if devMode {
 		log.Println("INFO running in development mode")
 	}
@@ -45,43 +53,43 @@ func NewLogger(devMode bool) *Logger {
 		fileLogger = log.New(logFile, "", log.LstdFlags)
 	}
 
-	return &Logger{DevMode: devMode, LogDir: logDir, CurrentLogFile: logFile, FileLog: fileLogger}
+	return &FileLogger{DevMode: devMode, LogDir: logDir, CurrentLogFile: logFile, FileLog: fileLogger}
 }
 
-func (l *Logger) LogFatal(err error) {
+func (l *FileLogger) LogFatal(err error) {
 	message := fmt.Sprintf("FATAL %s", err.Error())
-	l.LogToFile(message)
+	l.logToFile(message)
 	log.Fatal(message)
 }
 
-func (l *Logger) LogError(err error) {
+func (l *FileLogger) LogError(err error) {
 	message := fmt.Sprintf("ERROR %s", err.Error())
 	log.Println(message)
-	l.LogToFile(message)
+	l.logToFile(message)
 }
 
-func (l *Logger) LogWarn(message string) {
+func (l *FileLogger) LogWarn(message string) {
 	message = fmt.Sprintf("WARNING %s", message)
 	log.Println(message)
-	l.LogToFile(message)
+	l.logToFile(message)
 }
 
-func (l *Logger) LogInfo(message string) {
+func (l *FileLogger) LogInfo(message string) {
 	message = fmt.Sprintf("INFO %s", message)
 	log.Println(message)
-	l.LogToFile(message)
+	l.logToFile(message)
 }
 
-func (l *Logger) LogDebug(message string) {
+func (l *FileLogger) LogDebug(message string) {
 	message = fmt.Sprintf("DEBUG %s", message)
-	l.LogToFile(message)
+	l.logToFile(message)
 
 	if l.DevMode {
 		log.Println(message)
 	}
 }
 
-func (l *Logger) LogToFile(message string) {
+func (l *FileLogger) logToFile(message string) {
 	err := l.refreshLogFile()
 	if err != nil {
 		message := fmt.Sprintf("FATAL failed refreshing log file: %s", err.Error())
@@ -91,7 +99,7 @@ func (l *Logger) LogToFile(message string) {
 	l.FileLog.Println(message)
 }
 
-func (l *Logger) refreshLogFile() error {
+func (l *FileLogger) refreshLogFile() error {
 	filename := filepath.Base(l.CurrentLogFile.Name())
 
 	now := time.Now()
