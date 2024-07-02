@@ -70,8 +70,6 @@ func (es *AuthEmailService) BuildVerificationEmail(firstName, lastName, toAddr, 
 
 	subject := "Verify email address"
 
-	fmt.Printf("s: %s", subject)
-
 	link := es.ClientDomain + "/verify/" + token
 
 	plainTextContent := "Follow this link to verify your email address: " + link

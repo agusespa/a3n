@@ -115,7 +115,6 @@ func (l *FileLogger) refreshLogFile() error {
 			return err
 		}
 
-		log.Printf("size: %d", info.Size())
 		if info.Size() < 10000000 {
 			return nil
 		}
