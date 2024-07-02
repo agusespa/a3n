@@ -17,7 +17,7 @@ type MockEmailService struct {
 	BuildVerificationEmailResult    mail.SGMailV3
 }
 
-func NewMockEmailService(config models.Config, key string, logger logger.Logger) *MockEmailService {
+func NewMockEmailService(config models.Config, key string, logger logger.FileLogger) *MockEmailService {
 	return &MockEmailService{}
 }
 

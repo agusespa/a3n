@@ -123,8 +123,8 @@ func TestRefreshLogFile(t *testing.T) {
 
 	type LoggerTest struct {
 		name           string
-		initialLogger  Logger
-		expectedLogger Logger
+		initialLogger  FileLogger
+		expectedLogger FileLogger
 	}
 	var tests [3]LoggerTest
 
@@ -143,13 +143,13 @@ func TestRefreshLogFile(t *testing.T) {
 
 	test1 := &LoggerTest{
 		name: "new log file on a new day",
-		initialLogger: Logger{
+		initialLogger: FileLogger{
 			DevMode:        false,
 			LogDir:         testLogDir,
 			CurrentLogFile: initFile1,
 			FileLog:        log.New(initFile1, "", log.LstdFlags),
 		},
-		expectedLogger: Logger{
+		expectedLogger: FileLogger{
 			DevMode:        false,
 			LogDir:         testLogDir,
 			CurrentLogFile: expetedFile1,
@@ -169,7 +169,7 @@ func TestRefreshLogFile(t *testing.T) {
 		t.Errorf("failed to resize file: %s", err)
 	}
 
-	logger := &Logger{
+	logger := &FileLogger{
 		DevMode:        false,
 		LogDir:         testLogDir,
 		CurrentLogFile: initFile2,
@@ -202,13 +202,13 @@ func TestRefreshLogFile(t *testing.T) {
 
 	test3 := &LoggerTest{
 		name: "new file if size exceeds 10MB",
-		initialLogger: Logger{
+		initialLogger: FileLogger{
 			DevMode:        false,
 			LogDir:         testLogDir,
 			CurrentLogFile: initFile3,
 			FileLog:        log.New(initFile3, "", log.LstdFlags),
 		},
-		expectedLogger: Logger{
+		expectedLogger: FileLogger{
 			DevMode:        false,
 			LogDir:         testLogDir,
 			CurrentLogFile: expetedFile3,
