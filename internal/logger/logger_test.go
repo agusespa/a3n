@@ -42,7 +42,7 @@ func TestGetUserLogFile(t *testing.T) {
 	testLogDir := filepath.Join(tempDir, "test_logs")
 	err := os.MkdirAll(testLogDir, 0755)
 	if err != nil {
-		t.Errorf("Failed to create log directory: %s", err)
+		t.Errorf("failed to create log directory: %s", err)
 	}
 	defer os.RemoveAll(testLogDir)
 
@@ -86,19 +86,19 @@ func TestGetUserLogFile(t *testing.T) {
 			err = removeTestFiles(testLogDir)
 			err = createTestFiles(testLogDir, tt.existingFiles)
 			if err != nil {
-				t.Errorf("Failed to create test files: %s", err)
+				t.Errorf("failed to create test files: %s", err)
 			}
 
 			logFile, err := getUserLogFile(testLogDir)
 			if err != nil {
-				t.Errorf("Failed to get user log file: %s", err)
+				t.Errorf("failed to get user log file: %s", err)
 			}
 			defer logFile.Close()
 
 			actualLogFileName := filepath.Base(logFile.Name())
 
 			if actualLogFileName != tt.expectedFilename {
-				t.Errorf("Expected log file name %s, but got %s", tt.expectedFilename, actualLogFileName)
+				t.Errorf("expected log file name %s; got %s", tt.expectedFilename, actualLogFileName)
 			}
 		})
 	}
@@ -109,7 +109,7 @@ func TestRefreshLogFile(t *testing.T) {
 	testLogDir := filepath.Join(tempDir, "test_logs")
 	err := os.MkdirAll(testLogDir, 0755)
 	if err != nil {
-		t.Errorf("Failed to create log directory: %s", err)
+		t.Errorf("failed to create log directory: %s", err)
 	}
 	defer os.RemoveAll(testLogDir)
 
@@ -132,13 +132,13 @@ func TestRefreshLogFile(t *testing.T) {
 	initialFilePath := filepath.Join(testLogDir, fmt.Sprintf("%s_1.log", prevDate))
 	initFile1, err := os.OpenFile(initialFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		t.Errorf("Failed to create file: %s", err)
+		t.Errorf("failed to create file: %s", err)
 	}
 
 	expectedFilePath := filepath.Join(testLogDir, fmt.Sprintf("%s_1.log", date))
 	expetedFile1, err := os.OpenFile(expectedFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		t.Errorf("Failed to create file: %s", err)
+		t.Errorf("failed to create file: %s", err)
 	}
 
 	test1 := &LoggerTest{
@@ -162,11 +162,11 @@ func TestRefreshLogFile(t *testing.T) {
 	initialFilePath = filepath.Join(testLogDir, fmt.Sprintf("%s_1.log", date))
 	initFile2, err := os.OpenFile(initialFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		t.Errorf("Failed to create file: %s", err)
+		t.Errorf("failed to create file: %s", err)
 	}
 	err = initFile2.Truncate(500000)
 	if err != nil {
-		t.Errorf("Failed to resize file: %s", err)
+		t.Errorf("failed to resize file: %s", err)
 	}
 
 	logger := &Logger{
@@ -187,11 +187,11 @@ func TestRefreshLogFile(t *testing.T) {
 	initialFilePath = filepath.Join(testLogDir, fmt.Sprintf("%s_2.log", date))
 	initFile3, err := os.OpenFile(initialFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		t.Errorf("Failed to create file: %s", err)
+		t.Errorf("failed to create file: %s", err)
 	}
 	err = initFile3.Truncate(10000001)
 	if err != nil {
-		t.Errorf("Failed to resize file: %s", err)
+		t.Errorf("failed to resize file: %s", err)
 	}
 
 	expectedFilePath = filepath.Join(testLogDir, fmt.Sprintf("%s_3.log", date))
@@ -221,14 +221,14 @@ func TestRefreshLogFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err = tt.initialLogger.refreshLogFile()
 			if err != nil {
-				t.Errorf("Failed to refresh log file: %s", err)
+				t.Errorf("failed to refresh log file: %s", err)
 			}
 
 			actualLogFileName := filepath.Base(tt.initialLogger.CurrentLogFile.Name())
 			expectedLogFileName := filepath.Base(tt.expectedLogger.CurrentLogFile.Name())
 
 			if actualLogFileName != expectedLogFileName {
-				t.Errorf("Expected log file name %s, but got %s", expectedLogFileName, actualLogFileName)
+				t.Errorf("expected log file name %s; got %s", expectedLogFileName, actualLogFileName)
 			}
 
 			// TODO compare loggers
