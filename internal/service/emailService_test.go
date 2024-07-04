@@ -8,10 +8,10 @@ import (
 	"github.com/agusespa/a3n/mocks"
 )
 
-var es *AuthEmailService
+var es *DefaultEmailService
 
 func TestMain(m *testing.M) {
-	es = &AuthEmailService{
+	es = &DefaultEmailService{
 		Provider:        "sendgrid",
 		ClientDomain:    "https://example.com",
 		SenderName:      "Test Sender",

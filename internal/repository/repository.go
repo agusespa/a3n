@@ -22,15 +22,15 @@ type AuthRepository interface {
 	DeleteAllTokensByUserId(userID int64) error
 }
 
-type UserAuthRepository struct {
+type MySqlRepository struct {
 	DB *sql.DB
 }
 
-func NewAuthRepository(db *sql.DB) *UserAuthRepository {
-	return &UserAuthRepository{DB: db}
+func NewMySqlRepository(db *sql.DB) *MySqlRepository {
+	return &MySqlRepository{DB: db}
 }
 
-func (repo *UserAuthRepository) CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error) {
+func (repo *MySqlRepository) CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error) {
 	var middleName *string
 	if body.MiddleName == "" {
 		middleName = nil
@@ -57,7 +57,7 @@ func (repo *UserAuthRepository) CreateUser(uuid string, body models.UserRequest,
 	return id, nil
 }
 
-func (repo *UserAuthRepository) ReadUserByEmail(email string) (models.UserAuthEntity, error) {
+func (repo *MySqlRepository) ReadUserByEmail(email string) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
 
 	row := repo.DB.QueryRow("SELECT * FROM users WHERE email=?", email)
@@ -74,7 +74,7 @@ func (repo *UserAuthRepository) ReadUserByEmail(email string) (models.UserAuthEn
 	return user, nil
 }
 
-func (repo *UserAuthRepository) ReadUserById(userID int64) (models.UserAuthEntity, error) {
+func (repo *MySqlRepository) ReadUserById(userID int64) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
 
 	row := repo.DB.QueryRow("SELECT * FROM users WHERE user_id=?", userID)
@@ -91,7 +91,7 @@ func (repo *UserAuthRepository) ReadUserById(userID int64) (models.UserAuthEntit
 	return user, nil
 }
 
-func (repo *UserAuthRepository) UpdateUserEmailVerification(email string) error {
+func (repo *MySqlRepository) UpdateUserEmailVerification(email string) error {
 	result, err := repo.DB.Exec("UPDATE users SET email_verified = ? WHERE email = ?", true, email)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
@@ -112,7 +112,7 @@ func (repo *UserAuthRepository) UpdateUserEmailVerification(email string) error 
 	return nil
 }
 
-func (repo *UserAuthRepository) UpdateUserEmail(userID int64, email string) (int64, error) {
+func (repo *MySqlRepository) UpdateUserEmail(userID int64, email string) (int64, error) {
 	result, err := repo.DB.Exec("UPDATE users SET email = ? WHERE user_id = ?", email, userID)
 	if err != nil {
 		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1064 {
@@ -137,7 +137,7 @@ func (repo *UserAuthRepository) UpdateUserEmail(userID int64, email string) (int
 	return userID, nil
 }
 
-func (repo *UserAuthRepository) UpdateUserPassword(userID int64, hashedPassword *[]byte) (int64, error) {
+func (repo *MySqlRepository) UpdateUserPassword(userID int64, hashedPassword *[]byte) (int64, error) {
 	result, err := repo.DB.Exec("UPDATE users SET password_hash = ? WHERE user_id = ?", *hashedPassword, userID)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
@@ -158,7 +158,7 @@ func (repo *UserAuthRepository) UpdateUserPassword(userID int64, hashedPassword 
 	return userID, nil
 }
 
-func (repo *UserAuthRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthEntity, error) {
+func (repo *MySqlRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
 
 	query := `
@@ -181,7 +181,7 @@ func (repo *UserAuthRepository) ReadUserByToken(tokenHash []byte) (models.UserAu
 	return user, nil
 }
 
-func (repo *UserAuthRepository) CreateRefreshToken(userID int64, tokenHash []byte) error {
+func (repo *MySqlRepository) CreateRefreshToken(userID int64, tokenHash []byte) error {
 	_, err := repo.DB.Exec("INSERT INTO tokens (token_hash, user_id) VALUES (?, ?)", tokenHash, userID)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
@@ -190,7 +190,7 @@ func (repo *UserAuthRepository) CreateRefreshToken(userID int64, tokenHash []byt
 	return nil
 }
 
-func (repo *UserAuthRepository) DeleteTokenByHash(tokenHash []byte) error {
+func (repo *MySqlRepository) DeleteTokenByHash(tokenHash []byte) error {
 	_, err := repo.DB.Exec("DELETE FROM tokens WHERE token_hash = ?", tokenHash)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
@@ -199,7 +199,7 @@ func (repo *UserAuthRepository) DeleteTokenByHash(tokenHash []byte) error {
 	return nil
 }
 
-func (repo *UserAuthRepository) DeleteAllTokensByUserId(userID int64) error {
+func (repo *MySqlRepository) DeleteAllTokensByUserId(userID int64) error {
 	_, err := repo.DB.Exec("DELETE FROM tokens WHERE user_id = ?", userID)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)

@@ -34,7 +34,7 @@ type AuthService interface {
 	ValidateToken(token string) (*models.CustomClaims, error)
 }
 
-type UserAuthService struct {
+type DefaultAuthService struct {
 	AuthRepo        repository.AuthRepository
 	EncryptionKey   []byte
 	RefreshTokenExp int
@@ -44,8 +44,8 @@ type UserAuthService struct {
 	Logger          logger.Logger
 }
 
-func NewAuthService(authRepo *repository.UserAuthRepository, config models.ApiConfig, emailSrv EmailService, encryptionKey string, logger logger.Logger) *UserAuthService {
-	return &UserAuthService{
+func NewDefaultAuthService(authRepo *repository.MySqlRepository, config models.ApiConfig, emailSrv EmailService, encryptionKey string, logger logger.Logger) *DefaultAuthService {
+	return &DefaultAuthService{
 		AuthRepo:        authRepo,
 		EncryptionKey:   []byte(encryptionKey),
 		RefreshTokenExp: config.Token.RefreshExp,
@@ -55,7 +55,7 @@ func NewAuthService(authRepo *repository.UserAuthRepository, config models.ApiCo
 		Logger:          logger}
 }
 
-func (as *UserAuthService) PostUser(body models.UserRequest) (int64, error) {
+func (as *DefaultAuthService) PostUser(body models.UserRequest) (int64, error) {
 	if !isValidEmail(body.Email) {
 		err := errors.New("not a valid email address")
 		as.Logger.LogError(err)
@@ -98,7 +98,7 @@ func (as *UserAuthService) PostUser(body models.UserRequest) (int64, error) {
 	return id, nil
 }
 
-func (as *UserAuthService) BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error) {
+func (as *DefaultAuthService) BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error) {
 	token, err := as.generateEmailVerifyJWT(email)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func (as *UserAuthService) BuildVerificationEmail(firstName, lastName, email str
 	return as.EmailSrv.BuildVerificationEmail(firstName, lastName, email, token), nil
 }
 
-func (as *UserAuthService) PutUserEmailVerification(email string) error {
+func (as *DefaultAuthService) PutUserEmailVerification(email string) error {
 	err := as.AuthRepo.UpdateUserEmailVerification(email)
 	if err != nil {
 		as.Logger.LogError(err)
@@ -115,7 +115,7 @@ func (as *UserAuthService) PutUserEmailVerification(email string) error {
 	return err
 }
 
-func (as *UserAuthService) PutUserEmail(username, password, newEmail string) (int64, error) {
+func (as *DefaultAuthService) PutUserEmail(username, password, newEmail string) (int64, error) {
 	if !isValidEmail(newEmail) {
 		err := errors.New("not a valid email address")
 		as.Logger.LogError(err)
@@ -144,7 +144,7 @@ func (as *UserAuthService) PutUserEmail(username, password, newEmail string) (in
 	return id, nil
 }
 
-func (as *UserAuthService) PutUserPassword(username, password, newPassword string) (int64, error) {
+func (as *DefaultAuthService) PutUserPassword(username, password, newPassword string) (int64, error) {
 	if !isValidPassword(newPassword) {
 		err := errors.New("password doesn't meet minimum criteria")
 		as.Logger.LogError(err)
@@ -178,7 +178,7 @@ func (as *UserAuthService) PutUserPassword(username, password, newPassword strin
 	return id, nil
 }
 
-func (as *UserAuthService) GetUserLogin(username, password string) (models.UserAuthData, error) {
+func (as *DefaultAuthService) GetUserLogin(username, password string) (models.UserAuthData, error) {
 	var userAuthData models.UserAuthData
 
 	userData, err := as.AuthRepo.ReadUserByEmail(username)
@@ -231,7 +231,7 @@ func (as *UserAuthService) GetUserLogin(username, password string) (models.UserA
 	return userAuthData, err
 }
 
-func (as *UserAuthService) GetRefreshToken(refreshToken string) (string, error) {
+func (as *DefaultAuthService) GetRefreshToken(refreshToken string) (string, error) {
 
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
@@ -252,7 +252,7 @@ func (as *UserAuthService) GetRefreshToken(refreshToken string) (string, error) 
 	return accessToken, nil
 }
 
-func (as *UserAuthService) DeleteToken(refreshToken string) error {
+func (as *DefaultAuthService) DeleteToken(refreshToken string) error {
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
 		return err
@@ -265,7 +265,7 @@ func (as *UserAuthService) DeleteToken(refreshToken string) error {
 	return nil
 }
 
-func (as *UserAuthService) DeleteAllTokens(refreshToken string) error {
+func (as *DefaultAuthService) DeleteAllTokens(refreshToken string) error {
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
 		return err
@@ -283,7 +283,7 @@ func (as *UserAuthService) DeleteAllTokens(refreshToken string) error {
 	return nil
 }
 
-func (as *UserAuthService) ValidateToken(token string) (*models.CustomClaims, error) {
+func (as *DefaultAuthService) ValidateToken(token string) (*models.CustomClaims, error) {
 	parsedToken, err := jwt.ParseWithClaims(
 		token,
 		&models.CustomClaims{},
@@ -308,7 +308,7 @@ func (as *UserAuthService) ValidateToken(token string) (*models.CustomClaims, er
 	return claims, nil
 }
 
-func (as *UserAuthService) hashPassword(password string) ([]byte, error) {
+func (as *DefaultAuthService) hashPassword(password string) ([]byte, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		as.Logger.LogError(err)
@@ -319,7 +319,7 @@ func (as *UserAuthService) hashPassword(password string) ([]byte, error) {
 	return hashedPassword, nil
 }
 
-func (as *UserAuthService) generateAccessJWT(userID int64, userUUID string) (string, error) {
+func (as *DefaultAuthService) generateAccessJWT(userID int64, userUUID string) (string, error) {
 	accessExpiresBy := time.Now().Add(time.Duration(as.AccessTokenExp) * time.Minute).Unix()
 	claims := models.CustomClaims{
 		User: models.TokenUser{
@@ -342,7 +342,7 @@ func (as *UserAuthService) generateAccessJWT(userID int64, userUUID string) (str
 	return tokenString, nil
 }
 
-func (as *UserAuthService) generateRefreshToken() (string, error) {
+func (as *DefaultAuthService) generateRefreshToken() (string, error) {
 	token := make([]byte, 96)
 	_, err := rand.Read(token)
 	if err != nil {
@@ -355,7 +355,7 @@ func (as *UserAuthService) generateRefreshToken() (string, error) {
 	return encodedToken, nil
 }
 
-func (as *UserAuthService) hashRefreshToken(token string) ([]byte, error) {
+func (as *DefaultAuthService) hashRefreshToken(token string) ([]byte, error) {
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
 		as.Logger.LogError(err)
@@ -369,7 +369,7 @@ func (as *UserAuthService) hashRefreshToken(token string) ([]byte, error) {
 	return hashedToken, nil
 }
 
-func (as *UserAuthService) generateEmailVerifyJWT(email string) (string, error) {
+func (as *DefaultAuthService) generateEmailVerifyJWT(email string) (string, error) {
 	expiration := time.Now().Add(60 * time.Minute).Unix()
 	claims := models.CustomClaims{
 		Email: email,

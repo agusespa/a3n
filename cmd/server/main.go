@@ -52,13 +52,13 @@ func init() {
 		logg.LogFatal(fmt.Errorf("failed to establish database connection: %s", err.Error()))
 	}
 
-	authRepository := repository.NewAuthRepository(db)
+	authRepository := repository.NewMySqlRepository(db)
 
-	emailService := service.NewEmailService(config, emailApiKey, logg)
+	emailService := service.NewDefaultEmailService(config, emailApiKey, logg)
 
-	authService := service.NewAuthService(authRepository, config.Api, emailService, encryptionKey, logg)
+	authService := service.NewDefaultAuthService(authRepository, config.Api, emailService, encryptionKey, logg)
 
-	authHandler := handlers.NewAuthHandler(authService, logg)
+	authHandler := handlers.NewDefaultAuthHandler(authService, logg)
 
 	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
 	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)

@@ -16,7 +16,7 @@ type EmailService interface {
 	BuildVerificationEmail(firstName, lastName, toAddr, token string) *mail.SGMailV3
 }
 
-type AuthEmailService struct {
+type DefaultEmailService struct {
 	Provider        string // TODO support more clients
 	Client          *sendgrid.Client
 	ClientDomain    string
@@ -39,8 +39,8 @@ type EmailContent struct {
 	LinkColor       string
 }
 
-func NewEmailService(config models.Config, key string, logger logger.Logger) *AuthEmailService {
-	return &AuthEmailService{
+func NewDefaultEmailService(config models.Config, key string, logger logger.Logger) *DefaultEmailService {
+	return &DefaultEmailService{
 		Provider:        config.Api.Email.Provider,
 		Client:          sendgrid.NewSendClient(key),
 		ClientDomain:    config.Api.Client.Domain,
@@ -55,7 +55,7 @@ func NewEmailService(config models.Config, key string, logger logger.Logger) *Au
 		Logger:          logger}
 }
 
-func (es *AuthEmailService) SendEmail(email *mail.SGMailV3) {
+func (es *DefaultEmailService) SendEmail(email *mail.SGMailV3) {
 	response, err := es.Client.Send(email)
 	if err != nil {
 		es.Logger.LogError(fmt.Errorf("failed to send email: %v", err.Error()))
@@ -65,7 +65,7 @@ func (es *AuthEmailService) SendEmail(email *mail.SGMailV3) {
 	}
 }
 
-func (es *AuthEmailService) BuildVerificationEmail(firstName, lastName, toAddr, token string) *mail.SGMailV3 {
+func (es *DefaultEmailService) BuildVerificationEmail(firstName, lastName, toAddr, token string) *mail.SGMailV3 {
 	toName := firstName + " " + lastName
 
 	subject := "Verify email address"

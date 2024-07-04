@@ -27,16 +27,16 @@ type AuthHandler interface {
 	HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request)
 }
 
-type UserAuthHandler struct {
+type DefaultAuthHandler struct {
 	AuthService service.AuthService
 	Logger      logger.Logger
 }
 
-func NewAuthHandler(authService service.AuthService, logger logger.Logger) *UserAuthHandler {
-	return &UserAuthHandler{AuthService: authService, Logger: logger}
+func NewDefaultAuthHandler(authService service.AuthService, logger logger.Logger) *DefaultAuthHandler {
+	return &DefaultAuthHandler{AuthService: authService, Logger: logger}
 }
 
-func (h *UserAuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPost {
@@ -67,7 +67,7 @@ func (h *UserAuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Requ
 	payload.Write(w, r, res)
 }
 
-func (h *UserAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPut {
@@ -113,7 +113,7 @@ func (h *UserAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.R
 	payload.Write(w, r, res)
 }
 
-func (h *UserAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPut {
@@ -159,7 +159,7 @@ func (h *UserAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *htt
 	payload.Write(w, r, res)
 }
 
-func (h *UserAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -200,7 +200,7 @@ func (h *UserAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request
 	payload.Write(w, r, res)
 }
 
-func (h *UserAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -234,7 +234,7 @@ func (h *UserAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Requ
 	payload.Write(w, r, res)
 }
 
-func (h *UserAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPut {
@@ -276,7 +276,7 @@ func (h *UserAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *
 	payload.Write(w, r, nil)
 }
 
-func (h *UserAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -316,7 +316,7 @@ func (h *UserAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *htt
 	payload.Write(w, r, res)
 }
 
-func (h *UserAuthHandler) extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
+func (h *DefaultAuthHandler) extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
 	if !strings.HasPrefix(authHeader, "Basic ") {
 		err := errors.New("missing credentials")
 		h.Logger.LogError(err)
@@ -344,7 +344,7 @@ func (h *UserAuthHandler) extractBasicAuthCredentials(authHeader string) (userna
 	return
 }
 
-func (h *UserAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodDelete {
@@ -374,7 +374,7 @@ func (h *UserAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.R
 	payload.Write(w, r, "token successfully revoked")
 }
 
-func (h *UserAuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodDelete {
