@@ -84,7 +84,7 @@ func TestWrite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
-			Write(w, r, tt.payload)
+			Write(w, r, tt.payload, nil)
 
 			if w.Code != tt.expectedStatus {
 				t.Errorf("expected status %d; got %d", tt.expectedStatus, w.Code)

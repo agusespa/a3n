@@ -16,7 +16,7 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
-func Write(w http.ResponseWriter, r *http.Request, payload any) {
+func Write(w http.ResponseWriter, r *http.Request, payload any, cookies []*http.Cookie) {
 	if payload == nil {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -30,6 +30,13 @@ func Write(w http.ResponseWriter, r *http.Request, payload any) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(jsonBytes)))
+
+	if len(cookies) > 0 {
+		for _, c := range cookies {
+			http.SetCookie(w, c)
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
 
 	if _, err := w.Write(jsonBytes); err != nil {

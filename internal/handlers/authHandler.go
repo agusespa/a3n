@@ -64,7 +64,7 @@ func (h *DefaultAuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.R
 		UserID: id,
 	}
 
-	payload.Write(w, r, res)
+	payload.Write(w, r, res, nil)
 }
 
 func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +110,7 @@ func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *htt
 		UserID: id,
 	}
 
-	payload.Write(w, r, res)
+	payload.Write(w, r, res, nil)
 }
 
 func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
@@ -156,7 +156,7 @@ func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *
 		UserID: id,
 	}
 
-	payload.Write(w, r, res)
+	payload.Write(w, r, res, nil)
 }
 
 func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
@@ -197,7 +197,23 @@ func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Requ
 		RefreshToken: authData.RefreshToken,
 	}
 
-	payload.Write(w, r, res)
+	refresh_cookie := http.Cookie{
+		Name:     "refresh_token",
+		Value:    base64.URLEncoding.EncodeToString([]byte(authData.RefreshToken)),
+		Path:     "/",
+		HttpOnly: true,
+	}
+
+	access_cookie := http.Cookie{
+		Name:     "access_token",
+		Value:    base64.URLEncoding.EncodeToString([]byte(authData.AccessToken)),
+		Path:     "/",
+		HttpOnly: true,
+	}
+
+	cookies := []*http.Cookie{&refresh_cookie, &access_cookie}
+
+	payload.Write(w, r, res, cookies)
 }
 
 func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
@@ -231,7 +247,7 @@ func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.R
 		AccessToken: accessToken,
 	}
 
-	payload.Write(w, r, res)
+	payload.Write(w, r, res, nil)
 }
 
 func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
@@ -273,7 +289,7 @@ func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, 
 		return
 	}
 
-	payload.Write(w, r, nil)
+	payload.Write(w, r, nil, nil)
 }
 
 func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +329,7 @@ func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *
 		UserUUID: claims.User.UserUUID,
 	}
 
-	payload.Write(w, r, res)
+	payload.Write(w, r, res, nil)
 }
 
 func (h *DefaultAuthHandler) extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
@@ -371,7 +387,7 @@ func (h *DefaultAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *htt
 		return
 	}
 
-	payload.Write(w, r, "token successfully revoked")
+	payload.Write(w, r, "token successfully revoked", nil)
 }
 
 func (h *DefaultAuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
@@ -401,5 +417,5 @@ func (h *DefaultAuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r
 		return
 	}
 
-	payload.Write(w, r, "all user tokens successfully revoked")
+	payload.Write(w, r, "all user tokens successfully revoked", nil)
 }
