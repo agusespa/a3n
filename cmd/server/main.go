@@ -16,7 +16,7 @@ import (
 	"github.com/agusespa/a3n/internal/service"
 )
 
-var logg *logger.Logger
+var logg logger.Logger
 
 func init() {
 	var devFlag bool
@@ -52,13 +52,13 @@ func init() {
 		logg.LogFatal(fmt.Errorf("failed to establish database connection: %s", err.Error()))
 	}
 
-	authRepository := repository.NewAuthRepository(db)
+	authRepository := repository.NewMySqlRepository(db)
 
-	emailService := service.NewEmailService(config, emailApiKey, logg)
+	emailService := service.NewDefaultEmailService(config, emailApiKey, logg)
 
-	authService := service.NewAuthService(authRepository, config.Api, emailService, encryptionKey, logg)
+	authService := service.NewDefaultAuthService(authRepository, config.Api, emailService, encryptionKey, logg)
 
-	authHandler := handlers.NewAuthHandler(authService, logg)
+	authHandler := handlers.NewDefaultAuthHandler(authService, logg)
 
 	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
 	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
@@ -67,7 +67,7 @@ func init() {
 	http.HandleFunc("/authapi/user/password", authHandler.HandleUserPasswordChange)
 	http.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
 	http.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
-	http.HandleFunc("/authapi/logout/all", authHandler.HandleUserTokensRevocation)
+	http.HandleFunc("/authapi/logout/all", authHandler.HandleAllUserTokensRevocation)
 	http.HandleFunc("/authapi/logout", authHandler.HandleTokenRevocation)
 }
 

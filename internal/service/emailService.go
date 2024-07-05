@@ -11,9 +11,14 @@ import (
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
-type EmailService struct {
-	Provider        string
-	ApiKey          string
+type EmailService interface {
+	SendEmail(email *mail.SGMailV3)
+	BuildVerificationEmail(firstName, lastName, toAddr, token string) *mail.SGMailV3
+}
+
+type DefaultEmailService struct {
+	Provider        string // TODO support more clients
+	Client          *sendgrid.Client
 	ClientDomain    string
 	SenderName      string
 	SenderAddr      string
@@ -23,7 +28,7 @@ type EmailService struct {
 	FontColor       string
 	LinkColor       string
 	BackgroundColor string
-	Logger          *logger.Logger
+	Logger          logger.Logger
 }
 
 type EmailContent struct {
@@ -34,10 +39,10 @@ type EmailContent struct {
 	LinkColor       string
 }
 
-func NewEmailService(config models.Config, key string, logger *logger.Logger) *EmailService {
-	return &EmailService{
+func NewDefaultEmailService(config models.Config, key string, logger logger.Logger) *DefaultEmailService {
+	return &DefaultEmailService{
 		Provider:        config.Api.Email.Provider,
-		ApiKey:          key,
+		Client:          sendgrid.NewSendClient(key),
 		ClientDomain:    config.Api.Client.Domain,
 		SenderName:      config.Api.Email.Sender.Name,
 		SenderAddr:      config.Api.Email.Sender.Address,
@@ -50,9 +55,8 @@ func NewEmailService(config models.Config, key string, logger *logger.Logger) *E
 		Logger:          logger}
 }
 
-func (es *EmailService) SendEmail(email *mail.SGMailV3) {
-	client := sendgrid.NewSendClient(es.ApiKey)
-	response, err := client.Send(email)
+func (es *DefaultEmailService) SendEmail(email *mail.SGMailV3) {
+	response, err := es.Client.Send(email)
 	if err != nil {
 		es.Logger.LogError(fmt.Errorf("failed to send email: %v", err.Error()))
 	} else {
@@ -61,7 +65,7 @@ func (es *EmailService) SendEmail(email *mail.SGMailV3) {
 	}
 }
 
-func (es *EmailService) BuildVerificationEmail(firstName, lastName, toAddr, token string) *mail.SGMailV3 {
+func (es *DefaultEmailService) BuildVerificationEmail(firstName, lastName, toAddr, token string) *mail.SGMailV3 {
 	toName := firstName + " " + lastName
 
 	subject := "Verify email address"
@@ -94,5 +98,6 @@ func (es *EmailService) BuildVerificationEmail(firstName, lastName, toAddr, toke
 	from := mail.NewEmail(es.SenderName, es.SenderAddr)
 	to := mail.NewEmail(toName, toAddr)
 
-	return mail.NewSingleEmail(from, subject, to, plainTextContent, emailTemplate)
+	email := mail.NewSingleEmail(from, subject, to, plainTextContent, emailTemplate)
+	return email
 }

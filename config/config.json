@@ -9,7 +9,7 @@
       "name": "auth"
     },
     "token": {
-      "refreshExp": 10,
+      "refreshExp": 60,
       "accessExp": 5
     },
     "email": {
