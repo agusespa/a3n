@@ -59,6 +59,7 @@ type CustomClaims struct {
 	Type  string    `json:"type"`
 	jwt.StandardClaims
 }
+
 type TokenUser struct {
 	UserID   int64  `json:"userID"`
 	UserUUID string `json:"userUUID"`
@@ -70,6 +71,19 @@ type RegistrationResponse struct {
 
 type AuthenticationResponse struct {
 	UserUUID string `json:"userUUID"`
+}
+
+type CookieExpKind string
+
+const (
+	Access  CookieExpKind = "access"
+	Refresh CookieExpKind = "refresh"
+	Session CookieExpKind = "session"
+)
+
+type CookieOptions struct {
+	Path       string
+	Expiration CookieExpKind
 }
 
 func NewUserAuthData(userID int64, emailVerified bool, userUUID, accessToken, refreshToken string) UserAuthData {

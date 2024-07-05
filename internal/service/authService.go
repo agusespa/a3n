@@ -32,6 +32,7 @@ type AuthService interface {
 	DeleteToken(refreshToken string) error
 	DeleteAllTokens(refreshToken string) error
 	ValidateToken(token string) (*models.CustomClaims, error)
+	BuildCookie(name, value string, options models.CookieOptions) *http.Cookie
 }
 
 type DefaultAuthService struct {
@@ -56,7 +57,7 @@ func NewDefaultAuthService(authRepo *repository.MySqlRepository, config models.A
 	if config.Token.AccessExp == 0 {
 		accessExp = 5 // default to 5 minutes
 	} else {
-		accessExp = config.Token.RefreshExp
+		accessExp = config.Token.AccessExp
 	}
 
 	return &DefaultAuthService{
@@ -420,31 +421,19 @@ func isValidPassword(password string) bool {
 	return match
 }
 
-type CookieExpKind string
-
-const (
-	ACCESS  CookieExpKind = "access"
-	REFRESH CookieExpKind = "refresh"
-	SESSION CookieExpKind = "session"
-)
-
-type CookieOptions struct {
-	Path       string
-	Expiration CookieExpKind
-}
-
-func (as *DefaultAuthService) BuildCookie(name, value string, options CookieOptions) *http.Cookie {
+func (as *DefaultAuthService) BuildCookie(name, value string, options models.CookieOptions) *http.Cookie {
 	cookie := http.Cookie{
 		Name:     name,
 		Value:    base64.URLEncoding.EncodeToString([]byte(value)),
 		Path:     options.Path,
 		HttpOnly: true,
 	}
+
 	switch options.Expiration {
-	case ACCESS:
+	case models.Access:
 		expiresBy := time.Now().Add(time.Duration(as.AccessTokenExp) * time.Minute)
 		cookie.Expires = expiresBy
-	case REFRESH:
+	case models.Refresh:
 		expiresBy := time.Now().Add(time.Duration(as.RefreshTokenExp) * time.Minute)
 		cookie.Expires = expiresBy
 	}

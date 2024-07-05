@@ -197,21 +197,10 @@ func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Requ
 		RefreshToken: authData.RefreshToken,
 	}
 
-	refresh_cookie := http.Cookie{
-		Name:     "refresh_token",
-		Value:    base64.URLEncoding.EncodeToString([]byte(authData.RefreshToken)),
-		Path:     "/authapi/refresh",
-		HttpOnly: true,
-	}
+	refresh_cookie := h.AuthService.BuildCookie("refresh_token", authData.RefreshToken, models.CookieOptions{Path: "/authapi/refresh", Expiration: models.Refresh})
+	access_cookie := h.AuthService.BuildCookie("access_token", authData.AccessToken, models.CookieOptions{Path: "/", Expiration: models.Access})
 
-	access_cookie := http.Cookie{
-		Name:     "access_token",
-		Value:    base64.URLEncoding.EncodeToString([]byte(authData.AccessToken)),
-		Path:     "/",
-		HttpOnly: true,
-	}
-
-	cookies := []*http.Cookie{&refresh_cookie, &access_cookie}
+	cookies := []*http.Cookie{refresh_cookie, access_cookie}
 
 	payload.Write(w, r, res, cookies)
 }
@@ -261,14 +250,9 @@ func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.R
 		AccessToken: accessToken,
 	}
 
-	access_cookie := http.Cookie{
-		Name:     "access_token",
-		Value:    base64.URLEncoding.EncodeToString([]byte(accessToken)),
-		Path:     "/",
-		HttpOnly: true,
-	}
+	access_cookie := h.AuthService.BuildCookie("access_token", accessToken, models.CookieOptions{Path: "/", Expiration: models.Access})
 
-	cookies := []*http.Cookie{&access_cookie}
+	cookies := []*http.Cookie{access_cookie}
 
 	payload.Write(w, r, res, cookies)
 }
