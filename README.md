@@ -2,9 +2,9 @@
 
 A3N is a fast and light-weight microservice for basic jwt based authentication of front-end clients.
 
-# Running the api
+# Running the server
 ```sh
-make run-dev # start the api with debugging enabled
+make run-dev # start the server with debugging enabled
 ```
 ## Secrets
 The following secrets must be provided as environment variables:
@@ -75,7 +75,7 @@ To use a custom logo, provide the url to the file. It must be a png file named '
 "logoUrl": "https://github.com/agusespa/a3n/blob/main/config/assets/logo.png?raw=true"
 ```
 
-# Building the api
+# Building the server
 ```sh
 make build
 ```
