@@ -28,7 +28,7 @@ type AuthService interface {
 	PutUserEmail(username, password, newEmail string) (int64, error)
 	PutUserPassword(username, password, newPassword string) (int64, error)
 	GetUserLogin(username, password string) (models.UserAuthData, error)
-	GetRefreshToken(refreshToken string) (string, error)
+	GetFreshAccessToken(refreshToken string) (string, error)
 	DeleteToken(refreshToken string) error
 	DeleteAllTokens(refreshToken string) error
 	ValidateToken(token string) (*models.CustomClaims, error)
@@ -45,11 +45,25 @@ type DefaultAuthService struct {
 }
 
 func NewDefaultAuthService(authRepo *repository.MySqlRepository, config models.ApiConfig, emailSrv EmailService, encryptionKey string, logger logger.Logger) *DefaultAuthService {
+	var refreshExp int
+	if config.Token.RefreshExp == 0 {
+		refreshExp = 525600 // default to a year
+	} else {
+		refreshExp = config.Token.RefreshExp
+	}
+
+	var accessExp int
+	if config.Token.AccessExp == 0 {
+		accessExp = 5 // default to 5 minutes
+	} else {
+		accessExp = config.Token.RefreshExp
+	}
+
 	return &DefaultAuthService{
 		AuthRepo:        authRepo,
 		EncryptionKey:   []byte(encryptionKey),
-		RefreshTokenExp: config.Token.RefreshExp,
-		AccessTokenExp:  config.Token.AccessExp,
+		RefreshTokenExp: refreshExp,
+		AccessTokenExp:  accessExp,
 		EmailSrv:        emailSrv,
 		HardVerify:      config.Email.HardVerify,
 		Logger:          logger}
@@ -231,7 +245,7 @@ func (as *DefaultAuthService) GetUserLogin(username, password string) (models.Us
 	return userAuthData, err
 }
 
-func (as *DefaultAuthService) GetRefreshToken(refreshToken string) (string, error) {
+func (as *DefaultAuthService) GetFreshAccessToken(refreshToken string) (string, error) {
 
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
@@ -404,4 +418,35 @@ func isValidPassword(password string) bool {
 	regexPattern := `^.{8,}$`
 	match, _ := regexp.MatchString(regexPattern, password)
 	return match
+}
+
+type CookieExpKind string
+
+const (
+	ACCESS  CookieExpKind = "access"
+	REFRESH CookieExpKind = "refresh"
+	SESSION CookieExpKind = "session"
+)
+
+type CookieOptions struct {
+	Path       string
+	Expiration CookieExpKind
+}
+
+func (as *DefaultAuthService) BuildCookie(name, value string, options CookieOptions) *http.Cookie {
+	cookie := http.Cookie{
+		Name:     name,
+		Value:    base64.URLEncoding.EncodeToString([]byte(value)),
+		Path:     options.Path,
+		HttpOnly: true,
+	}
+	switch options.Expiration {
+	case ACCESS:
+		expiresBy := time.Now().Add(time.Duration(as.AccessTokenExp) * time.Minute)
+		cookie.Expires = expiresBy
+	case REFRESH:
+		expiresBy := time.Now().Add(time.Duration(as.RefreshTokenExp) * time.Minute)
+		cookie.Expires = expiresBy
+	}
+	return &cookie
 }

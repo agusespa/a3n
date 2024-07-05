@@ -24,7 +24,7 @@ type AuthHandler interface {
 	HandleUserEmailVerification(w http.ResponseWriter, r *http.Request)
 	HandleUserAuthentication(w http.ResponseWriter, r *http.Request)
 	HandleTokenRevocation(w http.ResponseWriter, r *http.Request)
-	HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request)
+	HandleAllUserTokensRevocation(w http.ResponseWriter, r *http.Request)
 }
 
 type DefaultAuthHandler struct {
@@ -79,7 +79,7 @@ func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *htt
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := errors.New("no bearer token")
+		err := errors.New("missing credentials")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
@@ -125,7 +125,7 @@ func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := errors.New("missing authorization header")
+		err := errors.New("missing credentials")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
@@ -171,7 +171,7 @@ func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Requ
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := errors.New("missing authorization header")
+		err := errors.New("missing credentials")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
@@ -200,7 +200,7 @@ func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Requ
 	refresh_cookie := http.Cookie{
 		Name:     "refresh_token",
 		Value:    base64.URLEncoding.EncodeToString([]byte(authData.RefreshToken)),
-		Path:     "/",
+		Path:     "/authapi/refresh",
 		HttpOnly: true,
 	}
 
@@ -226,18 +226,32 @@ func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	bearerToken := ""
+
 	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		err := errors.New("missing authorization header")
+	if authHeader != "" {
+		bearerToken = strings.Split(authHeader, " ")[1]
+	}
+
+	if bearerToken == "" {
+		cookie, err := r.Cookie("refresh_token")
+		if err == nil {
+			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
+			if err == nil {
+				bearerToken = string(decodedValue)
+			}
+		}
+	}
+
+	if bearerToken == "" {
+		err := errors.New("missing refresh token")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	bearerToken := strings.Split(authHeader, " ")[1]
-
-	accessToken, err := h.AuthService.GetRefreshToken(bearerToken)
+	accessToken, err := h.AuthService.GetFreshAccessToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -247,7 +261,16 @@ func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.R
 		AccessToken: accessToken,
 	}
 
-	payload.Write(w, r, res, nil)
+	access_cookie := http.Cookie{
+		Name:     "access_token",
+		Value:    base64.URLEncoding.EncodeToString([]byte(accessToken)),
+		Path:     "/",
+		HttpOnly: true,
+	}
+
+	cookies := []*http.Cookie{&access_cookie}
+
+	payload.Write(w, r, res, cookies)
 }
 
 func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
@@ -260,16 +283,31 @@ func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, 
 		return
 	}
 
+	bearerToken := ""
+
 	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		err := errors.New("missing authorization header")
+	if authHeader != "" {
+		bearerToken = strings.Split(authHeader, " ")[1]
+	}
+
+	if bearerToken == "" {
+		cookie, err := r.Cookie("access_token")
+		if err == nil {
+			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
+			if err == nil {
+				bearerToken = string(decodedValue)
+			}
+		}
+	}
+
+	if bearerToken == "" {
+		err := errors.New("missing access token")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	bearerToken := strings.Split(authHeader, " ")[1]
 	claims, err := h.AuthService.ValidateToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
@@ -302,16 +340,31 @@ func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *
 		return
 	}
 
+	bearerToken := ""
+
 	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		err := errors.New("missing authorization header")
+	if authHeader != "" {
+		bearerToken = strings.Split(authHeader, " ")[1]
+	}
+
+	if bearerToken == "" {
+		cookie, err := r.Cookie("access_token")
+		if err == nil {
+			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
+			if err == nil {
+				bearerToken = string(decodedValue)
+			}
+		}
+	}
+
+	if bearerToken == "" {
+		err := errors.New("missing access token")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	bearerToken := strings.Split(authHeader, " ")[1]
 	claims, err := h.AuthService.ValidateToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
@@ -372,7 +425,7 @@ func (h *DefaultAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *htt
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := errors.New("missing authorization header")
+		err := errors.New("missing refresh token")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(nil, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
@@ -390,7 +443,7 @@ func (h *DefaultAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *htt
 	payload.Write(w, r, "token successfully revoked", nil)
 }
 
-func (h *DefaultAuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleAllUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodDelete {
@@ -402,7 +455,7 @@ func (h *DefaultAuthHandler) HandleUserTokensRevocation(w http.ResponseWriter, r
 
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		err := errors.New("missing authorization header")
+		err := errors.New("missing refresh token")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)

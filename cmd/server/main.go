@@ -67,7 +67,7 @@ func init() {
 	http.HandleFunc("/authapi/user/password", authHandler.HandleUserPasswordChange)
 	http.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
 	http.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
-	http.HandleFunc("/authapi/logout/all", authHandler.HandleUserTokensRevocation)
+	http.HandleFunc("/authapi/logout/all", authHandler.HandleAllUserTokensRevocation)
 	http.HandleFunc("/authapi/logout", authHandler.HandleTokenRevocation)
 }
 
