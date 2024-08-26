@@ -18,7 +18,23 @@ import (
 
 var logg logger.Logger
 
-func init() {
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func main() {
 	var devFlag bool
 	flag.BoolVar(&devFlag, "dev", false, "enable development mode")
 	flag.Parse()
@@ -60,18 +76,17 @@ func init() {
 
 	authHandler := handlers.NewDefaultAuthHandler(authService, logg)
 
-	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
-	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
-	http.HandleFunc("/authapi/user/email/verify", authHandler.HandleUserEmailVerification)
-	http.HandleFunc("/authapi/user/email", authHandler.HandleUserEmailChange)
-	http.HandleFunc("/authapi/user/password", authHandler.HandleUserPasswordChange)
-	http.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
-	http.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
-	http.HandleFunc("/authapi/logout/all", authHandler.HandleAllUserTokensRevocation)
-	http.HandleFunc("/authapi/logout", authHandler.HandleTokenRevocation)
-}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
+	mux.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
+	mux.HandleFunc("/authapi/user/email/verify", authHandler.HandleUserEmailVerification)
+	mux.HandleFunc("/authapi/user/email", authHandler.HandleUserEmailChange)
+	mux.HandleFunc("/authapi/user/password", authHandler.HandleUserPasswordChange)
+	mux.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
+	mux.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
+	mux.HandleFunc("/authapi/logout/all", authHandler.HandleAllUserTokensRevocation)
+	mux.HandleFunc("/authapi/logout", authHandler.HandleTokenRevocation)
 
-func main() {
 	port := os.Getenv("A3N_PORT")
 	if port == "" {
 		port = "3001"
@@ -79,7 +94,7 @@ func main() {
 
 	logg.LogInfo(fmt.Sprintf("Listening on port %v", port))
 
-	err := http.ListenAndServe(":"+port, nil)
+	err = http.ListenAndServe(":"+port, corsMiddleware(mux))
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to start HTTP server: %s", err.Error()))
 	}
