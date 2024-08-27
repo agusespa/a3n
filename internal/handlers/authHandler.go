@@ -320,6 +320,13 @@ func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	userID, err := strconv.ParseInt(userIDquery, 10, 64)
+	if err != nil {
+		err := errors.New("internal error")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		payload.WriteError(w, r, err)
+		return
+	}
 
 	// TODO handle case of admin in claims
 	if claims.User.UserID != userID {
