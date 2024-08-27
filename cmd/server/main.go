@@ -18,9 +18,9 @@ import (
 
 var logg logger.Logger
 
-func corsMiddleware(next http.Handler) http.Handler {
+func corsMiddleware(next http.Handler, domain string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", domain)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -82,6 +82,7 @@ func main() {
 	mux.HandleFunc("/authapi/user/email/verify", authHandler.HandleUserEmailVerification)
 	mux.HandleFunc("/authapi/user/email", authHandler.HandleUserEmailChange)
 	mux.HandleFunc("/authapi/user/password", authHandler.HandleUserPasswordChange)
+	mux.HandleFunc("/authapi/user", authHandler.HandleUserData)
 	mux.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
 	mux.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
 	mux.HandleFunc("/authapi/logout/all", authHandler.HandleAllUserTokensRevocation)
@@ -94,7 +95,7 @@ func main() {
 
 	logg.LogInfo(fmt.Sprintf("Listening on port %v", port))
 
-	err = http.ListenAndServe(":"+port, corsMiddleware(mux))
+	err = http.ListenAndServe(":"+port, corsMiddleware(mux, config.Api.Client.Domain))
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to start HTTP server: %s", err.Error()))
 	}

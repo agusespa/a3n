@@ -1,7 +1,7 @@
 {
   "api": {
     "client": {
-      "domain": "http://localhost:3000"
+      "domain": "http://10.61.75.184:9000"
     },
     "database": {
       "user": "root",
@@ -10,7 +10,7 @@
     },
     "token": {
       "refreshExp": 60,
-      "accessExp": 5
+      "accessExp": 2
     },
     "email": {
       "provider": "sendgrid",

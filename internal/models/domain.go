@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -44,12 +45,24 @@ type UserAuthData struct {
 	RefreshToken  string `json:"refreshToken"`
 }
 
+type UserData struct {
+	UserID        int64     `json:"userID"`
+	UserUUID      string    `json:"userUUID"`
+	FirstName     string    `json:"firstName"`
+	MiddleName    string    `json:"middleName"`
+	LastName      string    `json:"lastName"`
+	Email         string    `json:"email"`
+	EmailVerified bool      `json:"emailVerified"`
+	CreatedAt     time.Time `json:"createdAt"`
+}
+
 type AuthRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
 type RefreshRequestResponse struct {
+	UserID      int64  `json:"user_id"`
 	AccessToken string `json:"accessToken"`
 }
 
@@ -93,5 +106,18 @@ func NewUserAuthData(userID int64, emailVerified bool, userUUID, accessToken, re
 		EmailVerified: emailVerified,
 		AccessToken:   accessToken,
 		RefreshToken:  refreshToken,
+	}
+}
+
+func NewUserData(userID int64, emailVerified bool, userUUID, firstName, lastName, email string, middleNameNullStr sql.NullString, createdAt time.Time) UserData {
+	return UserData{
+		UserID:        userID,
+		UserUUID:      userUUID,
+		FirstName:     firstName,
+		MiddleName:    middleNameNullStr.String,
+		LastName:      lastName,
+		Email:         email,
+		EmailVerified: emailVerified,
+		CreatedAt:     createdAt,
 	}
 }

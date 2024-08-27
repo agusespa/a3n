@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/agusespa/a3n/internal/httperrors"
@@ -190,19 +191,25 @@ func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	res := models.UserAuthData{
-		UserID:       authData.UserID,
-		UserUUID:     authData.UserUUID,
-		AccessToken:  authData.AccessToken,
-		RefreshToken: authData.RefreshToken,
+	acceptHeader := r.Header.Get("Accept")
+	if acceptHeader == "application/json+cookie" {
+		res := models.UserAuthData{
+			UserID:   authData.UserID,
+			UserUUID: authData.UserUUID,
+		}
+		refresh_cookie := h.AuthService.BuildCookie("refresh_token", authData.RefreshToken, models.CookieOptions{Path: "/authapi/refresh", Expiration: models.Refresh})
+		access_cookie := h.AuthService.BuildCookie("access_token", authData.AccessToken, models.CookieOptions{Path: "/authapi", Expiration: models.Access})
+		cookies := []*http.Cookie{refresh_cookie, access_cookie}
+		payload.Write(w, r, res, cookies)
+	} else {
+		res := models.UserAuthData{
+			UserID:       authData.UserID,
+			UserUUID:     authData.UserUUID,
+			AccessToken:  authData.AccessToken,
+			RefreshToken: authData.RefreshToken,
+		}
+		payload.Write(w, r, res, nil)
 	}
-
-	refresh_cookie := h.AuthService.BuildCookie("refresh_token", authData.RefreshToken, models.CookieOptions{Path: "/authapi/refresh", Expiration: models.Refresh})
-	access_cookie := h.AuthService.BuildCookie("access_token", authData.AccessToken, models.CookieOptions{Path: "/", Expiration: models.Access})
-
-	cookies := []*http.Cookie{refresh_cookie, access_cookie}
-
-	payload.Write(w, r, res, cookies)
 }
 
 func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
@@ -240,21 +247,96 @@ func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	accessToken, err := h.AuthService.GetFreshAccessToken(bearerToken)
+	accessToken, userID, err := h.AuthService.GetFreshAccessToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	res := models.RefreshRequestResponse{
-		AccessToken: accessToken,
+	acceptHeader := r.Header.Get("Accept")
+	if acceptHeader == "application/json+cookie" {
+		res := models.RefreshRequestResponse{
+			UserID: userID,
+		}
+		access_cookie := h.AuthService.BuildCookie("access_token", accessToken, models.CookieOptions{Path: "/authapi", Expiration: models.Access})
+		cookies := []*http.Cookie{access_cookie}
+		payload.Write(w, r, res, cookies)
+	} else {
+		res := models.RefreshRequestResponse{
+			UserID:      userID,
+			AccessToken: accessToken,
+		}
+		payload.Write(w, r, res, nil)
+	}
+}
+
+func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
+	if r.Method != http.MethodGet {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+		payload.WriteError(w, r, err)
+		return
 	}
 
-	access_cookie := h.AuthService.BuildCookie("access_token", accessToken, models.CookieOptions{Path: "/", Expiration: models.Access})
+	bearerToken := ""
 
-	cookies := []*http.Cookie{access_cookie}
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		bearerToken = strings.Split(authHeader, " ")[1]
+	}
 
-	payload.Write(w, r, res, cookies)
+	if bearerToken == "" {
+		cookie, err := r.Cookie("access_token")
+		if err == nil {
+			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
+			if err == nil {
+				bearerToken = string(decodedValue)
+			}
+		}
+	}
+
+	if bearerToken == "" {
+		err := errors.New("missing access token")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	claims, err := h.AuthService.ValidateToken(bearerToken)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	userIDquery := r.URL.Query().Get("id")
+	if userIDquery == "" {
+		err := errors.New("missing id parameter")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		payload.WriteError(w, r, err)
+		return
+	}
+	userID, err := strconv.ParseInt(userIDquery, 10, 64)
+
+	// TODO handle case of admin in claims
+	if claims.User.UserID != userID {
+		err := errors.New("user id missmatch")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	data, err := h.AuthService.GetUserData(userID)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	payload.Write(w, r, data, nil)
 }
 
 func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {

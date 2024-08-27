@@ -27,8 +27,9 @@ type AuthService interface {
 	PutUserEmailVerification(email string) error
 	PutUserEmail(username, password, newEmail string) (int64, error)
 	PutUserPassword(username, password, newPassword string) (int64, error)
+	GetUserData(id int64) (models.UserData, error)
 	GetUserLogin(username, password string) (models.UserAuthData, error)
-	GetFreshAccessToken(refreshToken string) (string, error)
+	GetFreshAccessToken(refreshToken string) (string, int64, error)
 	DeleteToken(refreshToken string) error
 	DeleteAllTokens(refreshToken string) error
 	ValidateToken(token string) (*models.CustomClaims, error)
@@ -42,6 +43,7 @@ type DefaultAuthService struct {
 	AccessTokenExp  int
 	EmailSrv        EmailService
 	HardVerify      bool
+	Domain          string
 	Logger          logger.Logger
 }
 
@@ -67,6 +69,7 @@ func NewDefaultAuthService(authRepo *repository.MySqlRepository, config models.A
 		AccessTokenExp:  accessExp,
 		EmailSrv:        emailSrv,
 		HardVerify:      config.Email.HardVerify,
+		Domain:          config.Client.Domain,
 		Logger:          logger}
 }
 
@@ -246,25 +249,38 @@ func (as *DefaultAuthService) GetUserLogin(username, password string) (models.Us
 	return userAuthData, err
 }
 
-func (as *DefaultAuthService) GetFreshAccessToken(refreshToken string) (string, error) {
+func (as *DefaultAuthService) GetUserData(id int64) (models.UserData, error) {
+	var userData models.UserData
+
+	userEntity, err := as.AuthRepo.ReadUserById(id)
+	if err != nil {
+		as.Logger.LogError(err)
+		return userData, err
+	}
+
+	userData = models.NewUserData(userEntity.UserID, userEntity.EmailVerified, userEntity.UserUUID, userEntity.Email, userEntity.FirstName, userEntity.LastName, userEntity.MiddleName, userEntity.CreatedAt)
+	return userData, err
+}
+
+func (as *DefaultAuthService) GetFreshAccessToken(refreshToken string) (string, int64, error) {
 
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
-		return "", err
+		return "", -1, err
 	}
 	userData, err := as.AuthRepo.ReadUserByToken(refreshTokenHash)
 	if err != nil {
 		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return "", err
+		return "", -1, err
 	}
 
 	accessToken, err := as.generateAccessJWT(userData.UserID, userData.UserUUID)
 	if err != nil {
-		return "", err
+		return "", -1, err
 	}
 
-	return accessToken, nil
+	return accessToken, userData.UserID, nil
 }
 
 func (as *DefaultAuthService) DeleteToken(refreshToken string) error {
