@@ -16,7 +16,7 @@ import (
 	"github.com/agusespa/a3n/internal/service"
 )
 
-type AuthHandler interface {
+type ApiHandler interface {
 	HandleUserRegister(w http.ResponseWriter, r *http.Request)
 	HandleUserEmailChange(w http.ResponseWriter, r *http.Request)
 	HandleUserPasswordChange(w http.ResponseWriter, r *http.Request)
@@ -28,16 +28,16 @@ type AuthHandler interface {
 	HandleAllUserTokensRevocation(w http.ResponseWriter, r *http.Request)
 }
 
-type DefaultAuthHandler struct {
-	AuthService service.AuthService
-	Logger      logger.Logger
+type DefaultApiHandler struct {
+	ApiService service.ApiService
+	Logger     logger.Logger
 }
 
-func NewDefaultAuthHandler(authService service.AuthService, logger logger.Logger) *DefaultAuthHandler {
-	return &DefaultAuthHandler{AuthService: authService, Logger: logger}
+func NewDefaultApiHandler(authService service.ApiService, logger logger.Logger) *DefaultApiHandler {
+	return &DefaultApiHandler{ApiService: authService, Logger: logger}
 }
 
-func (h *DefaultAuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPost {
@@ -55,7 +55,7 @@ func (h *DefaultAuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	id, err := h.AuthService.PostUser(userReq)
+	id, err := h.ApiService.PostUser(userReq)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -68,7 +68,7 @@ func (h *DefaultAuthHandler) HandleUserRegister(w http.ResponseWriter, r *http.R
 	payload.Write(w, r, res, nil)
 }
 
-func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPut {
@@ -101,7 +101,7 @@ func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *htt
 		return
 	}
 
-	id, err := h.AuthService.PutUserEmail(username, password, authReq.Email)
+	id, err := h.ApiService.PutUserEmail(username, password, authReq.Email)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -114,7 +114,7 @@ func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *htt
 	payload.Write(w, r, res, nil)
 }
 
-func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPut {
@@ -147,7 +147,7 @@ func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *
 		return
 	}
 
-	id, err := h.AuthService.PutUserPassword(username, password, authReq.Password)
+	id, err := h.ApiService.PutUserPassword(username, password, authReq.Password)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -160,7 +160,7 @@ func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *
 	payload.Write(w, r, res, nil)
 }
 
-func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -185,7 +185,7 @@ func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	authData, err := h.AuthService.GetUserLogin(username, password)
+	authData, err := h.ApiService.GetUserLogin(username, password)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -197,8 +197,8 @@ func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Requ
 			UserID:   authData.UserID,
 			UserUUID: authData.UserUUID,
 		}
-		refresh_cookie := h.AuthService.BuildCookie("refresh_token", authData.RefreshToken, models.CookieOptions{Path: "/authapi/refresh", Expiration: models.Refresh})
-		access_cookie := h.AuthService.BuildCookie("access_token", authData.AccessToken, models.CookieOptions{Path: "/authapi", Expiration: models.Access})
+		refresh_cookie := h.ApiService.BuildCookie("refresh_token", authData.RefreshToken, models.CookieOptions{Path: "/authapi/refresh", Expiration: models.Refresh})
+		access_cookie := h.ApiService.BuildCookie("access_token", authData.AccessToken, models.CookieOptions{Path: "/authapi", Expiration: models.Access})
 		cookies := []*http.Cookie{refresh_cookie, access_cookie}
 		payload.Write(w, r, res, cookies)
 	} else {
@@ -212,7 +212,7 @@ func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -247,7 +247,7 @@ func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	accessToken, userID, err := h.AuthService.GetFreshAccessToken(bearerToken)
+	accessToken, userID, err := h.ApiService.GetFreshAccessToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -258,7 +258,7 @@ func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.R
 		res := models.RefreshRequestResponse{
 			UserID: userID,
 		}
-		access_cookie := h.AuthService.BuildCookie("access_token", accessToken, models.CookieOptions{Path: "/authapi", Expiration: models.Access})
+		access_cookie := h.ApiService.BuildCookie("access_token", accessToken, models.CookieOptions{Path: "/authapi", Expiration: models.Access})
 		cookies := []*http.Cookie{access_cookie}
 		payload.Write(w, r, res, cookies)
 	} else {
@@ -270,7 +270,7 @@ func (h *DefaultAuthHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.R
 	}
 }
 
-func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleUserData(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -305,7 +305,7 @@ func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	claims, err := h.AuthService.ValidateToken(bearerToken)
+	claims, err := h.ApiService.ValidateToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -321,7 +321,6 @@ func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Reque
 	}
 	userID, err := strconv.ParseInt(userIDquery, 10, 64)
 	if err != nil {
-		err := errors.New("internal error")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusInternalServerError)
 		payload.WriteError(w, r, err)
@@ -337,7 +336,7 @@ func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	data, err := h.AuthService.GetUserData(userID)
+	data, err := h.ApiService.GetUserData(userID)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -346,7 +345,7 @@ func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Reque
 	payload.Write(w, r, data, nil)
 }
 
-func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodPut {
@@ -381,7 +380,7 @@ func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, 
 		return
 	}
 
-	claims, err := h.AuthService.ValidateToken(bearerToken)
+	claims, err := h.ApiService.ValidateToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -394,7 +393,7 @@ func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, 
 		payload.WriteError(w, r, err)
 	}
 
-	err = h.AuthService.PutUserEmailVerification(claims.Email)
+	err = h.ApiService.PutUserEmailVerification(claims.Email)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -403,7 +402,7 @@ func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, 
 	payload.Write(w, r, nil, nil)
 }
 
-func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -438,7 +437,7 @@ func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *
 		return
 	}
 
-	claims, err := h.AuthService.ValidateToken(bearerToken)
+	claims, err := h.ApiService.ValidateToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -458,7 +457,7 @@ func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *
 	payload.Write(w, r, res, nil)
 }
 
-func (h *DefaultAuthHandler) extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
+func (h *DefaultApiHandler) extractBasicAuthCredentials(authHeader string) (username, password string, err error) {
 	if !strings.HasPrefix(authHeader, "Basic ") {
 		err := errors.New("missing credentials")
 		h.Logger.LogError(err)
@@ -486,7 +485,7 @@ func (h *DefaultAuthHandler) extractBasicAuthCredentials(authHeader string) (use
 	return
 }
 
-func (h *DefaultAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodDelete {
@@ -507,7 +506,7 @@ func (h *DefaultAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *htt
 
 	bearerToken := strings.Split(authHeader, " ")[1]
 
-	err := h.AuthService.DeleteToken(bearerToken)
+	err := h.ApiService.DeleteToken(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
@@ -516,7 +515,7 @@ func (h *DefaultAuthHandler) HandleTokenRevocation(w http.ResponseWriter, r *htt
 	payload.Write(w, r, "token successfully revoked", nil)
 }
 
-func (h *DefaultAuthHandler) HandleAllUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleAllUserTokensRevocation(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodDelete {
@@ -537,7 +536,7 @@ func (h *DefaultAuthHandler) HandleAllUserTokensRevocation(w http.ResponseWriter
 
 	bearerToken := strings.Split(authHeader, " ")[1]
 
-	err := h.AuthService.DeleteAllTokens(bearerToken)
+	err := h.ApiService.DeleteAllTokens(bearerToken)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return

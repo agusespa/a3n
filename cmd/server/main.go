@@ -72,21 +72,26 @@ func main() {
 
 	emailService := service.NewDefaultEmailService(config, emailApiKey, logg)
 
-	authService := service.NewDefaultAuthService(authRepository, config.Api, emailService, encryptionKey, logg)
+	apiService := service.NewDefaultApiService(authRepository, config.Api, emailService, encryptionKey, logg)
 
-	authHandler := handlers.NewDefaultAuthHandler(authService, logg)
+	apiHandler := handlers.NewDefaultApiHandler(apiService, logg)
+
+	adminHandler := handlers.NewDefaultAdminHandler()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
-	mux.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
-	mux.HandleFunc("/authapi/user/email/verify", authHandler.HandleUserEmailVerification)
-	mux.HandleFunc("/authapi/user/email", authHandler.HandleUserEmailChange)
-	mux.HandleFunc("/authapi/user/password", authHandler.HandleUserPasswordChange)
-	mux.HandleFunc("/authapi/user", authHandler.HandleUserData)
-	mux.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
-	mux.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
-	mux.HandleFunc("/authapi/logout/all", authHandler.HandleAllUserTokensRevocation)
-	mux.HandleFunc("/authapi/logout", authHandler.HandleTokenRevocation)
+	mux.HandleFunc("/api/register", apiHandler.HandleUserRegister)
+	mux.HandleFunc("/api/login", apiHandler.HandleUserLogin)
+	mux.HandleFunc("/api/user/email/verify", apiHandler.HandleUserEmailVerification)
+	mux.HandleFunc("/api/user/email", apiHandler.HandleUserEmailChange)
+	mux.HandleFunc("/api/user/password", apiHandler.HandleUserPasswordChange)
+	mux.HandleFunc("/api/user", apiHandler.HandleUserData)
+	mux.HandleFunc("/api/authenticate", apiHandler.HandleUserAuthentication)
+	mux.HandleFunc("/api/refresh", apiHandler.HandleTokenRefresh)
+	mux.HandleFunc("/api/logout/all", apiHandler.HandleAllUserTokensRevocation)
+	mux.HandleFunc("/api/logout", apiHandler.HandleTokenRevocation)
+
+	mux.HandleFunc("/admin", adminHandler.HandleAdminDashboard)
+	mux.HandleFunc("/admin/login", adminHandler.HandleAdminLogin)
 
 	port := os.Getenv("A3N_PORT")
 	if port == "" {

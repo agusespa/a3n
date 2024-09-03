@@ -54,6 +54,7 @@ type UserData struct {
 	Email         string    `json:"email"`
 	EmailVerified bool      `json:"emailVerified"`
 	CreatedAt     time.Time `json:"createdAt"`
+	Roles         []string  `json:"roles"`
 }
 
 type AuthRequest struct {
@@ -66,10 +67,15 @@ type RefreshRequestResponse struct {
 	AccessToken string `json:"accessToken"`
 }
 
+type RoleRequest struct {
+	RoleName string `json:"role_name"`
+}
+
 type CustomClaims struct {
 	User  TokenUser `json:"user"`
 	Email string    `json:"email"`
 	Type  string    `json:"type"`
+	Roles []string  `json:"roles"`
 	jwt.StandardClaims
 }
 
@@ -109,7 +115,7 @@ func NewUserAuthData(userID int64, emailVerified bool, userUUID, accessToken, re
 	}
 }
 
-func NewUserData(userID int64, emailVerified bool, userUUID, firstName, lastName, email string, middleNameNullStr sql.NullString, createdAt time.Time) UserData {
+func NewUserData(userID int64, emailVerified bool, userUUID, firstName, lastName, email string, middleNameNullStr sql.NullString, createdAt time.Time, roles []string) UserData {
 	return UserData{
 		UserID:        userID,
 		UserUUID:      userUUID,
@@ -119,5 +125,6 @@ func NewUserData(userID int64, emailVerified bool, userUUID, firstName, lastName
 		Email:         email,
 		EmailVerified: emailVerified,
 		CreatedAt:     createdAt,
+		Roles:         roles,
 	}
 }
