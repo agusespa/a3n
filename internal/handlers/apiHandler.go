@@ -87,7 +87,7 @@ func (h *DefaultApiHandler) HandleUserEmailChange(w http.ResponseWriter, r *http
 		return
 	}
 
-	if req.Email == "" || req.Email == "" {
+	if req.Email == "" || req.Password == "" {
 		err := errors.New("missing credentials")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
@@ -134,7 +134,7 @@ func (h *DefaultApiHandler) HandleUserPasswordChange(w http.ResponseWriter, r *h
 		return
 	}
 
-	if req.Email == "" || req.Email == "" {
+	if req.Email == "" || req.Password == "" {
 		err := errors.New("missing credentials")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
