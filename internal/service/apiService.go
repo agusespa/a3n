@@ -30,6 +30,7 @@ type ApiService interface {
 	PutUserPassword(username, password, newPassword string) (int64, error)
 	GetUserData(id int64) (models.UserData, error)
 	GetUserLogin(username, password string) (models.UserAuthData, error)
+	GetUserAdminLogin(username, password, ipAddr string) (models.UserAuthData, error)
 	GetFreshAccessToken(refreshToken string) (string, int64, error)
 	DeleteToken(refreshToken string) error
 	DeleteAllTokens(refreshToken string) error
@@ -255,6 +256,35 @@ func (as *DefaultApiService) GetUserLogin(username, password string) (models.Use
 	return userAuthData, err
 }
 
+func (as *DefaultApiService) GetUserAdminLogin(username, password, ipAddr string) (models.UserAuthData, error) {
+	var userAuthData models.UserAuthData
+
+	userEntity, err := as.AuthRepo.ReadUserByEmail(username)
+	if err != nil {
+		as.Logger.LogError(err)
+		return userAuthData, err
+	}
+
+	if err := verifyHashedPassword(userEntity.PasswordHash, password); err != nil {
+		as.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		return userAuthData, err
+	}
+
+	roles := []string{}
+	if userEntity.Roles.Valid {
+		roles = strings.Split(userEntity.Roles.String, ",")
+	}
+
+	accessToken, err := as.generateAdminSessionJWT(userEntity.UserID, userEntity.UserUUID, roles, ipAddr)
+	if err != nil {
+		return userAuthData, err
+	}
+
+	userAuthData = models.NewUserAuthData(userEntity.UserID, userEntity.EmailVerified, userEntity.UserUUID, accessToken, "")
+	return userAuthData, err
+}
+
 func (as *DefaultApiService) GetUserData(id int64) (models.UserData, error) {
 	var userData models.UserData
 
@@ -374,6 +404,31 @@ func (as *DefaultApiService) generateAccessJWT(userID int64, userUUID string, ro
 			UserUUID: userUUID},
 		Type:  "access",
 		Roles: roles,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: accessExpiresBy,
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString(as.EncryptionKey)
+	if err != nil {
+		as.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func (as *DefaultApiService) generateAdminSessionJWT(userID int64, userUUID string, roles []string, ipAddr string) (string, error) {
+	accessExpiresBy := time.Now().Add(time.Duration(10) * time.Minute).Unix()
+	claims := models.CustomClaims{
+		User: models.TokenUser{
+			UserID:   userID,
+			UserUUID: userUUID},
+		Type:   "admin",
+		Roles:  roles,
+		IpAddr: ipAddr,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: accessExpiresBy,
 		},

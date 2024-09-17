@@ -4,16 +4,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/agusespa/a3n/internal/httperrors"
 )
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
+	var contentType, errorMessage string
+	var statusCode int
+
 	if customErr, ok := err.(*httperrors.Error); ok {
-		http.Error(w, customErr.Message(), customErr.Status())
+		errorMessage = customErr.Message()
+		statusCode = customErr.Status()
 	} else {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		errorMessage = "Internal Server Error"
+		statusCode = http.StatusInternalServerError
 	}
+
+	if isHTML(errorMessage) {
+		contentType = "text/html"
+	} else {
+		contentType = "text/plain"
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(statusCode)
+	w.Write([]byte(errorMessage))
 }
 
 func Write(w http.ResponseWriter, r *http.Request, payload any, cookies []*http.Cookie) {
@@ -22,14 +38,32 @@ func Write(w http.ResponseWriter, r *http.Request, payload any, cookies []*http.
 		return
 	}
 
-	jsonBytes, err := json.Marshal(payload)
-	if err != nil {
-		WriteError(w, r, err)
-		return
+	var contentType string
+	var responseBytes []byte
+	var err error
+
+	switch p := payload.(type) {
+	case string:
+		if isHTML(p) {
+			contentType = "text/html"
+		} else {
+			contentType = "text/plain"
+		}
+		responseBytes = []byte(p)
+	case []byte:
+		contentType = "application/octet-stream"
+		responseBytes = p
+	default:
+		contentType = "application/json"
+		responseBytes, err = json.Marshal(payload)
+		if err != nil {
+			WriteError(w, r, err)
+			return
+		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(jsonBytes)))
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(responseBytes)))
 
 	if len(cookies) > 0 {
 		for _, c := range cookies {
@@ -39,8 +73,12 @@ func Write(w http.ResponseWriter, r *http.Request, payload any, cookies []*http.
 
 	w.WriteHeader(http.StatusOK)
 
-	if _, err := w.Write(jsonBytes); err != nil {
+	if _, err := w.Write(responseBytes); err != nil {
 		WriteError(w, r, err)
 		return
 	}
+}
+
+func isHTML(s string) bool {
+	return strings.Contains(s, "<") && strings.Contains(s, ">")
 }

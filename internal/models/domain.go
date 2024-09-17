@@ -58,8 +58,15 @@ type UserData struct {
 }
 
 type AuthRequest struct {
-	Email    string `json:"email"`
+	Email    string `json:"username"`
 	Password string `json:"password"`
+}
+
+type CredentialsChangeRequest struct {
+	Email       string `json:"username"`
+	Password    string `json:"password"`
+	NewEmail    string `json:"new_username"`
+	NewPassword string `json:"new_password"`
 }
 
 type RefreshRequestResponse struct {
@@ -72,10 +79,11 @@ type RoleRequest struct {
 }
 
 type CustomClaims struct {
-	User  TokenUser `json:"user"`
-	Email string    `json:"email"`
-	Type  string    `json:"type"`
-	Roles []string  `json:"roles"`
+	User   TokenUser `json:"user"`
+	Email  string    `json:"email"`
+	Type   string    `json:"type"`
+	Roles  []string  `json:"roles"`
+	IpAddr string    `json:"ipaddr"`
 	jwt.StandardClaims
 }
 

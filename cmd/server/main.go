@@ -76,7 +76,7 @@ func main() {
 
 	apiHandler := handlers.NewDefaultApiHandler(apiService, logg)
 
-	adminHandler := handlers.NewDefaultAdminHandler()
+	adminHandler := handlers.NewDefaultAdminHandler(apiService, logg)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/register", apiHandler.HandleUserRegister)
@@ -90,7 +90,7 @@ func main() {
 	mux.HandleFunc("/api/logout/all", apiHandler.HandleAllUserTokensRevocation)
 	mux.HandleFunc("/api/logout", apiHandler.HandleTokenRevocation)
 
-	mux.HandleFunc("/admin", adminHandler.HandleAdminDashboard)
+	mux.HandleFunc("/admin/dashboard", adminHandler.HandleAdminDashboard)
 	mux.HandleFunc("/admin/login", adminHandler.HandleAdminLogin)
 
 	port := os.Getenv("A3N_PORT")
