@@ -29,7 +29,10 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(statusCode)
-	w.Write([]byte(errorMessage))
+	if _, err := w.Write([]byte(errorMessage)); err != nil {
+		// TODO handle properly
+		return
+	}
 }
 
 func Write(w http.ResponseWriter, r *http.Request, payload any, cookies []*http.Cookie) {

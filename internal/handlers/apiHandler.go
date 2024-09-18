@@ -186,7 +186,7 @@ func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Reque
 	authReq.Email = r.Form.Get("username")
 	authReq.Password = r.Form.Get("password")
 
-	if authReq.Email == "" || authReq.Email == "" {
+	if authReq.Email == "" || authReq.Password == "" {
 		err := errors.New("missing credentials")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
