@@ -60,8 +60,38 @@ func (repo *MySqlRepository) CreateUser(uuid string, body models.UserRequest, pa
 func (repo *MySqlRepository) ReadUserByEmail(email string) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
 
-	row := repo.DB.QueryRow("SELECT * FROM users WHERE email=?", email)
-	err := row.Scan(&user.UserID, &user.UserUUID, &user.FirstName, &user.MiddleName, &user.LastName, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
+	query := `
+		SELECT 
+			u.user_id, 
+			u.user_uuid, 
+			u.first_name, 
+			u.middle_name, 
+			u.last_name, 
+			u.email, 
+			u.password_hash, 
+			u.email_verified, 
+			u.created_at,
+			GROUP_CONCAT(r.role_name) AS roles
+		FROM users u
+		LEFT JOIN user_roles ur ON u.user_id = ur.user_id
+		LEFT JOIN roles r ON ur.role_id = r.role_id
+		WHERE u.email = ?
+		GROUP BY u.user_id
+	`
+
+	row := repo.DB.QueryRow(query, email)
+	err := row.Scan(
+		&user.UserID,
+		&user.UserUUID,
+		&user.FirstName,
+		&user.MiddleName,
+		&user.LastName,
+		&user.Email,
+		&user.PasswordHash,
+		&user.EmailVerified,
+		&user.CreatedAt,
+		&user.Roles,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err = httperrors.NewError(err, http.StatusNotFound)
@@ -74,11 +104,41 @@ func (repo *MySqlRepository) ReadUserByEmail(email string) (models.UserAuthEntit
 	return user, nil
 }
 
-func (repo *MySqlRepository) ReadUserById(userID int64) (models.UserAuthEntity, error) {
+func (repo *MySqlRepository) ReadUserById(id int64) (models.UserAuthEntity, error) {
 	var user models.UserAuthEntity
 
-	row := repo.DB.QueryRow("SELECT * FROM users WHERE user_id=?", userID)
-	err := row.Scan(&user.UserID, &user.UserUUID, &user.FirstName, &user.MiddleName, &user.LastName, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
+	query := `
+		SELECT 
+			u.user_id, 
+			u.user_uuid, 
+			u.first_name, 
+			u.middle_name, 
+			u.last_name, 
+			u.email, 
+			u.password_hash, 
+			u.email_verified, 
+			u.created_at,
+			GROUP_CONCAT(r.role_name) AS roles
+		FROM users u
+		LEFT JOIN user_roles ur ON u.user_id = ur.user_id
+		LEFT JOIN roles r ON ur.role_id = r.role_id
+		WHERE u.user_id = ?
+		GROUP BY u.user_id
+	`
+
+	row := repo.DB.QueryRow(query, id)
+	err := row.Scan(
+		&user.UserID,
+		&user.UserUUID,
+		&user.FirstName,
+		&user.MiddleName,
+		&user.LastName,
+		&user.Email,
+		&user.PasswordHash,
+		&user.EmailVerified,
+		&user.CreatedAt,
+		&user.Roles,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err = httperrors.NewError(err, http.StatusNotFound)
@@ -162,13 +222,38 @@ func (repo *MySqlRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthE
 	var user models.UserAuthEntity
 
 	query := `
-      SELECT users.* 
-      FROM users 
-      JOIN tokens ON users.user_id = tokens.user_id
-      WHERE tokens.token_hash = ? 
-  `
+		SELECT 
+			u.user_id, 
+			u.user_uuid, 
+			u.first_name, 
+			u.middle_name, 
+			u.last_name, 
+			u.email, 
+			u.password_hash, 
+			u.email_verified, 
+			u.created_at,
+			GROUP_CONCAT(r.role_name) AS roles
+		FROM users u
+		JOIN tokens t ON u.user_id = t.user_id
+		LEFT JOIN user_roles ur ON u.user_id = ur.user_id
+		LEFT JOIN roles r ON ur.role_id = r.role_id
+		WHERE t.token_hash = ?
+		GROUP BY u.user_id
+	`
+
 	row := repo.DB.QueryRow(query, tokenHash)
-	err := row.Scan(&user.UserID, &user.UserUUID, &user.FirstName, &user.MiddleName, &user.LastName, &user.Email, &user.PasswordHash, &user.EmailVerified, &user.CreatedAt)
+	err := row.Scan(
+		&user.UserID,
+		&user.UserUUID,
+		&user.FirstName,
+		&user.MiddleName,
+		&user.LastName,
+		&user.Email,
+		&user.PasswordHash,
+		&user.EmailVerified,
+		&user.CreatedAt,
+		&user.Roles,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err = httperrors.NewError(err, http.StatusNotFound)

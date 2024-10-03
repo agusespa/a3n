@@ -13,7 +13,7 @@ func ConnectDB(config models.Database, password string) (*sql.DB, error) {
 		Passwd:    password,
 		Net:       "tcp",
 		Addr:      config.Address,
-		DBName:    config.Name,
+		DBName:    "a3n",
 		ParseTime: true,
 	}
 

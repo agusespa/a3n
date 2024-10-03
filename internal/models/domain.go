@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -44,19 +45,45 @@ type UserAuthData struct {
 	RefreshToken  string `json:"refreshToken"`
 }
 
+type UserData struct {
+	UserID        int64     `json:"userID"`
+	UserUUID      string    `json:"userUUID"`
+	FirstName     string    `json:"firstName"`
+	MiddleName    string    `json:"middleName"`
+	LastName      string    `json:"lastName"`
+	Email         string    `json:"email"`
+	EmailVerified bool      `json:"emailVerified"`
+	CreatedAt     time.Time `json:"createdAt"`
+	Roles         []string  `json:"roles"`
+}
+
 type AuthRequest struct {
-	Email    string `json:"email"`
+	Email    string `json:"username"`
 	Password string `json:"password"`
 }
 
+type CredentialsChangeRequest struct {
+	Email       string `json:"username"`
+	Password    string `json:"password"`
+	NewEmail    string `json:"new_username"`
+	NewPassword string `json:"new_password"`
+}
+
 type RefreshRequestResponse struct {
+	UserID      int64  `json:"user_id"`
 	AccessToken string `json:"accessToken"`
 }
 
+type RoleRequest struct {
+	RoleName string `json:"role_name"`
+}
+
 type CustomClaims struct {
-	User  TokenUser `json:"user"`
-	Email string    `json:"email"`
-	Type  string    `json:"type"`
+	User   TokenUser `json:"user"`
+	Email  string    `json:"email"`
+	Type   string    `json:"type"`
+	Roles  []string  `json:"roles"`
+	IpAddr string    `json:"ipaddr"`
 	jwt.StandardClaims
 }
 
@@ -93,5 +120,19 @@ func NewUserAuthData(userID int64, emailVerified bool, userUUID, accessToken, re
 		EmailVerified: emailVerified,
 		AccessToken:   accessToken,
 		RefreshToken:  refreshToken,
+	}
+}
+
+func NewUserData(userID int64, emailVerified bool, userUUID, firstName, lastName, email string, middleNameNullStr sql.NullString, createdAt time.Time, roles []string) UserData {
+	return UserData{
+		UserID:        userID,
+		UserUUID:      userUUID,
+		FirstName:     firstName,
+		MiddleName:    middleNameNullStr.String,
+		LastName:      lastName,
+		Email:         email,
+		EmailVerified: emailVerified,
+		CreatedAt:     createdAt,
+		Roles:         roles,
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -18,7 +19,26 @@ import (
 
 var logg logger.Logger
 
-func init() {
+func corsMiddleware(next http.Handler, domain string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", domain)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+//go:embed config/config.json
+var configFile embed.FS
+
+func main() {
 	var devFlag bool
 	flag.BoolVar(&devFlag, "dev", false, "enable development mode")
 	flag.Parse()
@@ -37,12 +57,12 @@ func init() {
 		logg.LogFatal(errors.New("failed to get EMAIL_API_KEY variable"))
 	}
 
-	configFile, err := os.ReadFile("config/config.json")
+	var config models.Config
+	configData, err := configFile.ReadFile("config/config.json")
 	if err != nil {
 		logg.LogFatal(err)
 	}
-	var config models.Config
-	err = json.Unmarshal(configFile, &config)
+	err = json.Unmarshal(configData, &config)
 	if err != nil {
 		logg.LogFatal(err)
 	}
@@ -56,22 +76,27 @@ func init() {
 
 	emailService := service.NewDefaultEmailService(config, emailApiKey, logg)
 
-	authService := service.NewDefaultAuthService(authRepository, config.Api, emailService, encryptionKey, logg)
+	apiService := service.NewDefaultApiService(authRepository, config.Api, emailService, encryptionKey, logg)
 
-	authHandler := handlers.NewDefaultAuthHandler(authService, logg)
+	apiHandler := handlers.NewDefaultApiHandler(apiService, logg)
 
-	http.HandleFunc("/authapi/register", authHandler.HandleUserRegister)
-	http.HandleFunc("/authapi/login", authHandler.HandleUserLogin)
-	http.HandleFunc("/authapi/user/email/verify", authHandler.HandleUserEmailVerification)
-	http.HandleFunc("/authapi/user/email", authHandler.HandleUserEmailChange)
-	http.HandleFunc("/authapi/user/password", authHandler.HandleUserPasswordChange)
-	http.HandleFunc("/authapi/authenticate", authHandler.HandleUserAuthentication)
-	http.HandleFunc("/authapi/refresh", authHandler.HandleTokenRefresh)
-	http.HandleFunc("/authapi/logout/all", authHandler.HandleAllUserTokensRevocation)
-	http.HandleFunc("/authapi/logout", authHandler.HandleTokenRevocation)
-}
+	adminHandler := handlers.NewDefaultAdminHandler(apiService, logg)
 
-func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/register", apiHandler.HandleUserRegister)
+	mux.HandleFunc("/api/login", apiHandler.HandleUserLogin)
+	mux.HandleFunc("/api/user/email/verify", apiHandler.HandleUserEmailVerification)
+	mux.HandleFunc("/api/user/email", apiHandler.HandleUserEmailChange)
+	mux.HandleFunc("/api/user/password", apiHandler.HandleUserPasswordChange)
+	mux.HandleFunc("/api/user", apiHandler.HandleUserData)
+	mux.HandleFunc("/api/authenticate", apiHandler.HandleUserAuthentication)
+	mux.HandleFunc("/api/refresh", apiHandler.HandleTokenRefresh)
+	mux.HandleFunc("/api/logout/all", apiHandler.HandleAllUserTokensRevocation)
+	mux.HandleFunc("/api/logout", apiHandler.HandleTokenRevocation)
+
+	mux.HandleFunc("/admin/dashboard", adminHandler.HandleAdminDashboard)
+	mux.HandleFunc("/admin/login", adminHandler.HandleAdminLogin)
+
 	port := os.Getenv("A3N_PORT")
 	if port == "" {
 		port = "3001"
@@ -79,7 +104,7 @@ func main() {
 
 	logg.LogInfo(fmt.Sprintf("Listening on port %v", port))
 
-	err := http.ListenAndServe(":"+port, nil)
+	err = http.ListenAndServe(":"+port, corsMiddleware(mux, config.Api.Client.Domain))
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to start HTTP server: %s", err.Error()))
 	}
