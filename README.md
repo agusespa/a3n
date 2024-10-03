@@ -1,4 +1,4 @@
-A3N is a light-weight identyt and access management service for jwt based authentication.
+A3N is a light-weight identity and access management service for jwt based authentication.
 
 # Set up
 ## Dependencies
