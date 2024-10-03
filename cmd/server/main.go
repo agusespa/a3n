@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -34,6 +35,9 @@ func corsMiddleware(next http.Handler, domain string) http.Handler {
 	})
 }
 
+//go:embed config/config.json
+var configFile embed.FS
+
 func main() {
 	var devFlag bool
 	flag.BoolVar(&devFlag, "dev", false, "enable development mode")
@@ -53,12 +57,12 @@ func main() {
 		logg.LogFatal(errors.New("failed to get EMAIL_API_KEY variable"))
 	}
 
-	configFile, err := os.ReadFile("config/config.json")
+	var config models.Config
+	configData, err := configFile.ReadFile("config/config.json")
 	if err != nil {
 		logg.LogFatal(err)
 	}
-	var config models.Config
-	err = json.Unmarshal(configFile, &config)
+	err = json.Unmarshal(configData, &config)
 	if err != nil {
 		logg.LogFatal(err)
 	}

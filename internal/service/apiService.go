@@ -76,13 +76,13 @@ func NewDefaultApiService(authRepo *repository.MySqlRepository, config models.Ap
 }
 
 func (as *DefaultApiService) PostUser(body models.UserRequest) (int64, error) {
-	if !isValidEmail(body.Email) {
+	if !IsValidEmail(body.Email) {
 		err := errors.New("not a valid email address")
 		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
 		return 0, err
 	}
-	if !isValidPassword(body.Password) {
+	if !IsValidPassword(body.Password) {
 		err := errors.New("password doesn't meet minimum criteria")
 		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
@@ -136,7 +136,7 @@ func (as *DefaultApiService) PutUserEmailVerification(email string) error {
 }
 
 func (as *DefaultApiService) PutUserEmail(username, password, newEmail string) (int64, error) {
-	if !isValidEmail(newEmail) {
+	if !IsValidEmail(newEmail) {
 		err := errors.New("not a valid email address")
 		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
@@ -165,7 +165,7 @@ func (as *DefaultApiService) PutUserEmail(username, password, newEmail string) (
 }
 
 func (as *DefaultApiService) PutUserPassword(username, password, newPassword string) (int64, error) {
-	if !isValidPassword(newPassword) {
+	if !IsValidPassword(newPassword) {
 		err := errors.New("password doesn't meet minimum criteria")
 		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
@@ -498,12 +498,12 @@ func verifyHashedPassword(hashedPassword []byte, password string) error {
 	return err
 }
 
-func isValidEmail(email string) bool {
+func IsValidEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil
 }
 
-func isValidPassword(password string) bool {
+func IsValidPassword(password string) bool {
 	regexPattern := `^.{8,}$`
 	match, _ := regexp.MatchString(regexPattern, password)
 	return match

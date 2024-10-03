@@ -19,7 +19,6 @@ type Client struct {
 type Database struct {
 	User    string `json:"user"`
 	Address string `json:"address"`
-	Name    string `json:"name"`
 }
 
 type Token struct {

@@ -4,9 +4,8 @@
       "domain": "http://10.61.75.162:9000"
     },
     "database": {
-      "user": "root",
-      "address": "localhost:3306",
-      "name": "auth"
+      "user": "a3n",
+      "address": "192.168.64.7:3306"
     },
     "token": {
       "refreshExp": 60,
