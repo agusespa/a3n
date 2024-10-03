@@ -17,7 +17,7 @@ type EmailService interface {
 }
 
 type DefaultEmailService struct {
-	Provider        string // TODO support more clients
+	Provider        string
 	Client          *sendgrid.Client
 	ClientDomain    string
 	SenderName      string
