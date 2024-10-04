@@ -197,11 +197,27 @@ func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Reque
 	if isAdminClient {
 		adminAuthData, err := h.ApiService.GetUserAdminLogin(authReq.Email, authReq.Password, helpers.GetIP(r))
 		if err != nil {
-			payload.WriteError(w, r, err)
+			var statusCode int
+			var message string
+			if customErr, ok := err.(*httperrors.Error); ok {
+				statusCode = customErr.Status()
+			} else {
+				statusCode = http.StatusInternalServerError
+			}
+			if statusCode == http.StatusForbidden {
+				message = `<div class="error">Username not registered</div>`
+			} else if statusCode == http.StatusNotFound {
+				message = `<div class="error">Username not registered</div>`
+			} else if statusCode == http.StatusUnauthorized {
+				message = `<div class="error">Incorrect password</div>`
+			} else {
+				message = `<div class="error">Unknown error</div>`
+			}
+			payload.WriteHTMLError(w, r, err, message)
 			return
 		}
 		w.Header().Set("HX-Redirect", "/a3n/admin/dashboard")
-		res := `<div id="response"><div id="redirecting">Login successful. Redirecting...</div></div>`
+		res := `<div class="success">Login successful. Redirecting...</div>`
 		access_cookie := h.ApiService.BuildCookie("access_token", adminAuthData.AccessToken, models.CookieOptions{Path: "/a3n/admin"})
 		cookies := []*http.Cookie{access_cookie}
 		payload.Write(w, r, res, cookies)

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/exp/slices"
 
 	"github.com/agusespa/a3n/internal/httperrors"
 	"github.com/agusespa/a3n/internal/logger"
@@ -274,6 +275,11 @@ func (as *DefaultApiService) GetUserAdminLogin(username, password, ipAddr string
 	roles := []string{}
 	if userEntity.Roles.Valid {
 		roles = strings.Split(userEntity.Roles.String, ",")
+	}
+	if !slices.Contains(roles, "admin") {
+		err = httperrors.NewError(errors.New("missing admin role"), http.StatusForbidden)
+		as.Logger.LogError(err)
+		return userAuthData, err
 	}
 
 	accessToken, err := as.generateAdminSessionJWT(userEntity.UserID, userEntity.UserUUID, roles, ipAddr)

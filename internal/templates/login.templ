@@ -5,8 +5,11 @@ templ Login() {
 <html>
 
 <head>
+    <meta charset="UTF-8">
     <title>Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -83,18 +86,16 @@ templ Login() {
             display: none;
             font-size: 12px;
             margin-left: 10px;
-            color: #fff;
         }
 
-        .htmx-request .indicator {
+        .htmx-request {
             display: inline;
         }
 
         #message {
             text-align: center;
-            padding: 10px;
+            padding: 20px 10px 0px 10px;
             font-size: 14px;
-            margin-top: 20px;
         }
 
         .success {
@@ -105,11 +106,23 @@ templ Login() {
             color: #ff0000;
         }
     </style>
+    <script>
+        const allowSwap = [403, 404];
+        document.addEventListener("DOMContentLoaded", (event) => {
+            document.body.addEventListener('htmx:beforeSwap', function (evt) {
+                if (allowSwap.includes(evt.detail.xhr.status)) {
+                    evt.detail.shouldSwap = true;
+                    evt.detail.isError = false;
+                }
+            });
+        })
+    </script>
 </head>
 
 <body>
-    <form hx-post="/a3n/api/login" hx-trigger="submit" hx-swap="innerHTML"
-        hx-headers='{"Accept": "application/json+cookie, text/plain, text/html", "X-Admin-Request": "true"}' hx-indicator="#loading">
+    <form hx-post="/api/login" hx-trigger="submit" hx-target="#message" hx-swap="innerHTML"
+        hx-headers='{"Accept": "application/json+cookie, text/html", "X-Admin-Request": "true"}' hx-indicator="#loading"
+        hx-disabled-elt="#loginButton">
         <h1>Login</h1>
         <div>
             <label for="username">Username</label>
@@ -119,12 +132,11 @@ templ Login() {
             <label for="password">Password</label>
             <input type="password" id="password" name="password" placeholder="Enter password" required />
         </div>
-        <button type="submit">Log in
-            <span id="loading" class="indicator"> ...</span>
+        <button type="submit" id="loginButton">Log in
+            <span id="loading" class="indicator">...</span>
         </button>
+        <div id="message"></div>
     </form>
-
-    <div id="message"></div>
 </body>
 
 </html>
