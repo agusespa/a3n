@@ -243,9 +243,9 @@ func (h *DefaultApiHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	w.Header().Set("HX-Redirect", "/a3n/admin/dashboard")
+	w.Header().Set("HX-Redirect", "/admin/dashboard")
 	res := `<div class="success">Login successful. Redirecting...</div>`
-	access_cookie := h.ApiService.BuildCookie("access_token", adminAuthData.AccessToken, models.CookieOptions{Path: "/a3n/admin"})
+	access_cookie := h.ApiService.BuildCookie("access_token", adminAuthData.AccessToken, models.CookieOptions{Path: "/admin"})
 	cookies := []*http.Cookie{access_cookie}
 	payload.Write(w, r, res, cookies)
 }
