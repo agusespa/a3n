@@ -21,7 +21,9 @@ type ApiHandler interface {
 	HandleUserRegister(w http.ResponseWriter, r *http.Request)
 	HandleUserEmailChange(w http.ResponseWriter, r *http.Request)
 	HandleUserPasswordChange(w http.ResponseWriter, r *http.Request)
+	HandleLogin(w http.ResponseWriter, r *http.Request)
 	HandleUserLogin(w http.ResponseWriter, r *http.Request)
+	HandleAdminLogin(w http.ResponseWriter, r *http.Request)
 	HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
 	HandleUserEmailVerification(w http.ResponseWriter, r *http.Request)
 	HandleUserAuthentication(w http.ResponseWriter, r *http.Request)
@@ -51,6 +53,22 @@ func (h *DefaultApiHandler) HandleUserRegister(w http.ResponseWriter, r *http.Re
 	var userReq models.UserRequest
 	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
 		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if userReq.FirstName == "" || userReq.LastName == "" {
+		err := errors.New("name not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if userReq.Email == "" || userReq.Password == "" {
+		err := errors.New("missing credentials")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
@@ -89,16 +107,16 @@ func (h *DefaultApiHandler) HandleUserEmailChange(w http.ResponseWriter, r *http
 
 	if req.Email == "" || req.Password == "" {
 		err := errors.New("missing credentials")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
 
 	if req.NewEmail == "" {
 		err := errors.New("missing new email address")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -136,16 +154,16 @@ func (h *DefaultApiHandler) HandleUserPasswordChange(w http.ResponseWriter, r *h
 
 	if req.Email == "" || req.Password == "" {
 		err := errors.New("missing credentials")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
 
 	if req.NewPassword == "" {
 		err := errors.New("missing new password")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -163,10 +181,8 @@ func (h *DefaultApiHandler) HandleUserPasswordChange(w http.ResponseWriter, r *h
 	payload.Write(w, r, res, nil)
 }
 
-func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
-
-	isAdminClient := r.Header.Get("X-Admin-Request") == "true"
 
 	if r.Method != http.MethodPost {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
@@ -175,6 +191,16 @@ func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	isAdminClient := r.Header.Get("X-Admin-Request") == "true"
+
+	if isAdminClient {
+		h.HandleAdminLogin(w, r)
+	} else {
+		h.HandleUserLogin(w, r)
+	}
+}
+
+func (h *DefaultApiHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	var authReq models.AuthRequest
 	err := r.ParseForm()
 	if err != nil {
@@ -188,39 +214,59 @@ func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Reque
 
 	if authReq.Email == "" || authReq.Password == "" {
 		err := errors.New("missing credentials")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
+		h.Logger.LogError(err)
+		message := `<div class="error">Missing credentials</div>`
+		payload.WriteHTMLError(w, r, err, message)
 		return
 	}
 
-	if isAdminClient {
-		adminAuthData, err := h.ApiService.GetUserAdminLogin(authReq.Email, authReq.Password, helpers.GetIP(r))
-		if err != nil {
-			var statusCode int
-			var message string
-			if customErr, ok := err.(*httperrors.Error); ok {
-				statusCode = customErr.Status()
-			} else {
-				statusCode = http.StatusInternalServerError
-			}
-			if statusCode == http.StatusForbidden {
-				message = `<div class="error">Username not registered</div>`
-			} else if statusCode == http.StatusNotFound {
-				message = `<div class="error">Username not registered</div>`
-			} else if statusCode == http.StatusUnauthorized {
-				message = `<div class="error">Incorrect password</div>`
-			} else {
-				message = `<div class="error">Unknown error</div>`
-			}
-			payload.WriteHTMLError(w, r, err, message)
-			return
+	adminAuthData, err := h.ApiService.GetUserAdminLogin(authReq.Email, authReq.Password, helpers.GetIP(r))
+	if err != nil {
+		var statusCode int
+		var message string
+		if customErr, ok := err.(*httperrors.Error); ok {
+			statusCode = customErr.Status()
+		} else {
+			statusCode = http.StatusInternalServerError
 		}
-		w.Header().Set("HX-Redirect", "/a3n/admin/dashboard")
-		res := `<div class="success">Login successful. Redirecting...</div>`
-		access_cookie := h.ApiService.BuildCookie("access_token", adminAuthData.AccessToken, models.CookieOptions{Path: "/a3n/admin"})
-		cookies := []*http.Cookie{access_cookie}
-		payload.Write(w, r, res, cookies)
+		if statusCode == http.StatusForbidden {
+			message = `<div class="error">Username not registered</div>`
+		} else if statusCode == http.StatusNotFound {
+			message = `<div class="error">Username not registered</div>`
+		} else if statusCode == http.StatusUnauthorized {
+			message = `<div class="error">Incorrect password</div>`
+		} else {
+			message = `<div class="error">Unknown error</div>`
+		}
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/a3n/admin/dashboard")
+	res := `<div class="success">Login successful. Redirecting...</div>`
+	access_cookie := h.ApiService.BuildCookie("access_token", adminAuthData.AccessToken, models.CookieOptions{Path: "/a3n/admin"})
+	cookies := []*http.Cookie{access_cookie}
+	payload.Write(w, r, res, cookies)
+}
+
+func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
+	var authReq models.AuthRequest
+	err := r.ParseForm()
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+	authReq.Email = r.Form.Get("username")
+	authReq.Password = r.Form.Get("password")
+
+	if authReq.Email == "" || authReq.Password == "" {
+		err := errors.New("missing credentials")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
 		return
 	}
 
@@ -367,7 +413,6 @@ func (h *DefaultApiHandler) HandleUserData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// TODO handle case of admin in claims
 	if claims.User.UserID != userID {
 		err := errors.New("user id missmatch")
 		h.Logger.LogError(err)
@@ -375,6 +420,8 @@ func (h *DefaultApiHandler) HandleUserData(w http.ResponseWriter, r *http.Reques
 		payload.WriteError(w, r, err)
 		return
 	}
+
+	// TODO handle case of admin in claims
 
 	data, err := h.ApiService.GetUserData(userID)
 	if err != nil {

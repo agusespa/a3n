@@ -84,7 +84,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/register", apiHandler.HandleUserRegister)
-	mux.HandleFunc("/api/login", apiHandler.HandleUserLogin)
+	mux.HandleFunc("/api/login", apiHandler.HandleLogin)
 	mux.HandleFunc("/api/user/email/verify", apiHandler.HandleUserEmailVerification)
 	mux.HandleFunc("/api/user/email", apiHandler.HandleUserEmailChange)
 	mux.HandleFunc("/api/user/password", apiHandler.HandleUserPasswordChange)

@@ -79,20 +79,14 @@ func NewDefaultApiService(authRepo *repository.MySqlRepository, config models.Ap
 func (as *DefaultApiService) PostUser(body models.UserRequest) (int64, error) {
 	if !IsValidEmail(body.Email) {
 		err := errors.New("not a valid email address")
-		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
+		as.Logger.LogError(err)
 		return 0, err
 	}
 	if !IsValidPassword(body.Password) {
 		err := errors.New("password doesn't meet minimum criteria")
-		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
-		return 0, err
-	}
-	if body.FirstName == "" || body.LastName == "" {
-		err := errors.New("name not provided")
 		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusBadRequest)
 		return 0, err
 	}
 

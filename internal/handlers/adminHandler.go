@@ -4,15 +4,15 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"html/template"
 	"net/http"
+	"path/filepath"
 
-	"github.com/a-h/templ"
 	"github.com/agusespa/a3n/internal/helpers"
 	"github.com/agusespa/a3n/internal/httperrors"
 	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/payload"
 	"github.com/agusespa/a3n/internal/service"
-	"github.com/agusespa/a3n/internal/templates"
 )
 
 type AdminHandler interface {
@@ -32,29 +32,47 @@ func NewDefaultAdminHandler(authService service.ApiService, logger logger.Logger
 func (h *DefaultAdminHandler) HandleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
-	userID, err := h.authenticateAdminUser(r)
-	if err != nil {
-		w.Header().Set("HX-Redirect", "/a3n/admin/login")
-		payload.WriteError(w, r, err)
-		return
-	}
+	// userID, err := h.authenticateAdminUser(r)
+	// if err != nil {
+	// 	w.Header().Set("HX-Redirect", "/a3n/admin/login")
+	// 	h.Logger.LogError(err)
+	// 	payload.WriteError(w, r, err)
+	// 	return
+	// }
 
-	data, err := h.ApiService.GetUserData(userID)
-	w.Header().Set("HX-Redirect", "/a3n/admin/login")
-	if err != nil {
-		payload.WriteError(w, r, err)
-		return
-	}
+	// data, err := h.ApiService.GetUserData(userID)
+	// if err != nil {
+	// 	w.Header().Set("HX-Redirect", "/a3n/admin/login")
+	// 	h.Logger.LogError(err)
+	// 	payload.WriteError(w, r, err)
+	// 	return
+	// }
 
-	adminComponent := templates.Dashboard(data)
-	templ.Handler(adminComponent).ServeHTTP(w, r)
+	// adminComponent := templates.Dashboard(data)
+	// templ.Handler(adminComponent).ServeHTTP(w, r)
 }
 
 func (h *DefaultAdminHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
-	loginComponent := templates.Login()
-	templ.Handler(loginComponent).ServeHTTP(w, r)
+	tmplPath := filepath.Join("internal", "templates", "admin_login.html")
+	tmpl, err := template.ParseFiles(tmplPath)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		h.Logger.LogError(err)
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		h.Logger.LogError(err)
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
 }
 
 func (h *DefaultAdminHandler) authenticateAdminUser(r *http.Request) (int64, error) {

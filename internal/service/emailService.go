@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"path/filepath"
 
 	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
@@ -75,7 +76,8 @@ func (es *DefaultEmailService) BuildVerificationEmail(firstName, lastName, toAdd
 	plainTextContent := "Follow this link to verify your email address: " + link
 
 	emailTemplate := "<p>Follow this link to verify your email address:&nbsp;</p><a>" + link + "</a>"
-	tmpl, err := template.ParseFiles("./config/assets/verify.html")
+	tmplPath := filepath.Join("internal", "templates", "email_verify.html")
+	tmpl, err := template.ParseFiles(tmplPath)
 	if err == nil {
 		content := EmailContent{
 			Link:            link,
