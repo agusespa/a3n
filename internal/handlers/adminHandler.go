@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"embed"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -29,6 +30,9 @@ func NewDefaultAdminHandler(authService service.ApiService, logger logger.Logger
 	return &DefaultAdminHandler{ApiService: authService, Logger: logger}
 }
 
+//go:embed templates/admin_dash.html
+var templatesFS embed.FS
+
 func (h *DefaultAdminHandler) HandleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
@@ -49,7 +53,7 @@ func (h *DefaultAdminHandler) HandleAdminDashboard(w http.ResponseWriter, r *htt
 	}
 
 	tmplPath := filepath.Join("internal", "templates", "admin_dash.html")
-	tmpl, err := template.ParseFiles(tmplPath)
+	tmpl, err := template.ParseFS(templatesFS, tmplPath)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
 		h.Logger.LogError(err)
@@ -72,7 +76,7 @@ func (h *DefaultAdminHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Re
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	tmplPath := filepath.Join("internal", "templates", "admin_login.html")
-	tmpl, err := template.ParseFiles(tmplPath)
+	tmpl, err := template.ParseFS(templatesFS, tmplPath)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
 		h.Logger.LogError(err)

@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"html/template"
 	"path/filepath"
@@ -66,6 +67,9 @@ func (es *DefaultEmailService) SendEmail(email *mail.SGMailV3) {
 	}
 }
 
+//go:embed templates/email_verify.html
+var templatesFS embed.FS
+
 func (es *DefaultEmailService) BuildVerificationEmail(firstName, lastName, toAddr, token string) *mail.SGMailV3 {
 	toName := firstName + " " + lastName
 
@@ -76,8 +80,9 @@ func (es *DefaultEmailService) BuildVerificationEmail(firstName, lastName, toAdd
 	plainTextContent := "Follow this link to verify your email address: " + link
 
 	emailTemplate := "<p>Follow this link to verify your email address:&nbsp;</p><a>" + link + "</a>"
+
 	tmplPath := filepath.Join("internal", "templates", "email_verify.html")
-	tmpl, err := template.ParseFiles(tmplPath)
+	tmpl, err := template.ParseFS(templatesFS, tmplPath)
 	if err == nil {
 		content := EmailContent{
 			Link:            link,
