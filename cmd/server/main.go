@@ -90,7 +90,7 @@ func main() {
 	mux.HandleFunc("/api/user/password", apiHandler.HandleUserPasswordChange)
 	mux.HandleFunc("/api/user", apiHandler.HandleUserData)
 	mux.HandleFunc("/api/authenticate", apiHandler.HandleUserAuthentication)
-	mux.HandleFunc("/api/refresh", apiHandler.HandleTokenRefresh)
+	mux.HandleFunc("/api/refresh", apiHandler.HandleRefresh)
 	mux.HandleFunc("/api/logout/all", apiHandler.HandleAllUserTokensRevocation)
 	mux.HandleFunc("/api/logout", apiHandler.HandleTokenRevocation)
 

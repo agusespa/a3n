@@ -2,14 +2,12 @@ package handlers
 
 import (
 	"embed"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
 
-	"github.com/agusespa/a3n/internal/helpers"
 	"github.com/agusespa/a3n/internal/httperrors"
 	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/payload"
@@ -30,29 +28,39 @@ func NewDefaultAdminHandler(authService service.ApiService, logger logger.Logger
 	return &DefaultAdminHandler{ApiService: authService, Logger: logger}
 }
 
-//go:embed templates/admin_dash.html
+//go:embed templates/*.html
 var templatesFS embed.FS
 
 func (h *DefaultAdminHandler) HandleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
-	userID, err := h.authenticateAdminUser(r)
+	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		w.Header().Set("HX-Redirect", "/a3n/admin/login")
+		err := errors.New("missing refresh token")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
+		message := `<div class="error">Missing refresh token</div>`
+		payload.WriteHTMLError(w, r, err, message)
 		return
 	}
 
-	data, err := h.ApiService.GetUserData(userID)
+	claims, err := h.ApiService.AuthenticateAdminUser(cookie.Value, r)
 	if err != nil {
-		w.Header().Set("HX-Redirect", "/a3n/admin/login")
 		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
+		message := `<div class="error">Failed authentication</div>`
+		payload.WriteHTMLError(w, r, err, message)
 		return
 	}
 
-	tmplPath := filepath.Join("internal", "templates", "admin_dash.html")
+	data, err := h.ApiService.GetUserData(claims.User.UserID)
+	if err != nil {
+		h.Logger.LogError(err)
+		message := `<div class="error">Failed authentication</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	tmplPath := filepath.Join("templates", "admin_dash.html")
 	tmpl, err := template.ParseFS(templatesFS, tmplPath)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
@@ -75,7 +83,7 @@ func (h *DefaultAdminHandler) HandleAdminDashboard(w http.ResponseWriter, r *htt
 func (h *DefaultAdminHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
-	tmplPath := filepath.Join("internal", "templates", "admin_login.html")
+	tmplPath := filepath.Join("templates", "admin_login.html")
 	tmpl, err := template.ParseFS(templatesFS, tmplPath)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
@@ -93,44 +101,4 @@ func (h *DefaultAdminHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Re
 		payload.WriteHTMLError(w, r, err, message)
 		return
 	}
-}
-
-func (h *DefaultAdminHandler) authenticateAdminUser(r *http.Request) (int64, error) {
-	bearerToken := ""
-
-	cookie, err := r.Cookie("access_token")
-	if err == nil {
-		decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-		if err == nil {
-			bearerToken = string(decodedValue)
-		}
-	}
-
-	if bearerToken == "" {
-		err := errors.New("missing access token")
-		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return 0, err
-	}
-
-	claims, err := h.ApiService.ValidateToken(bearerToken)
-	if err != nil {
-		return 0, err
-	}
-
-	if claims.Type != "admin" {
-		err := errors.New("invalid jwt claim")
-		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return 0, err
-	}
-
-	if claims.IpAddr != helpers.GetIP(r) {
-		err := errors.New("invalid ip address")
-		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return 0, err
-	}
-
-	return claims.User.UserID, nil
 }

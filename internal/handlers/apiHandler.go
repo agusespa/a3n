@@ -22,9 +22,11 @@ type ApiHandler interface {
 	HandleUserEmailChange(w http.ResponseWriter, r *http.Request)
 	HandleUserPasswordChange(w http.ResponseWriter, r *http.Request)
 	HandleLogin(w http.ResponseWriter, r *http.Request)
-	HandleUserLogin(w http.ResponseWriter, r *http.Request)
-	HandleAdminLogin(w http.ResponseWriter, r *http.Request)
-	HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
+	handleUserLogin(w http.ResponseWriter, r *http.Request)
+	handleAdminLogin(w http.ResponseWriter, r *http.Request)
+	HandleRefresh(w http.ResponseWriter, r *http.Request)
+	handleAdminTokenRefresh(w http.ResponseWriter, r *http.Request)
+	handleUserTokenRefresh(w http.ResponseWriter, r *http.Request)
 	HandleUserEmailVerification(w http.ResponseWriter, r *http.Request)
 	HandleUserAuthentication(w http.ResponseWriter, r *http.Request)
 	HandleTokenRevocation(w http.ResponseWriter, r *http.Request)
@@ -36,8 +38,8 @@ type DefaultApiHandler struct {
 	Logger     logger.Logger
 }
 
-func NewDefaultApiHandler(authService service.ApiService, logger logger.Logger) *DefaultApiHandler {
-	return &DefaultApiHandler{ApiService: authService, Logger: logger}
+func NewDefaultApiHandler(apiService service.ApiService, logger logger.Logger) *DefaultApiHandler {
+	return &DefaultApiHandler{ApiService: apiService, Logger: logger}
 }
 
 func (h *DefaultApiHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
@@ -194,13 +196,13 @@ func (h *DefaultApiHandler) HandleLogin(w http.ResponseWriter, r *http.Request) 
 	isAdminClient := r.Header.Get("X-Admin-Request") == "true"
 
 	if isAdminClient {
-		h.HandleAdminLogin(w, r)
+		h.handleAdminLogin(w, r)
 	} else {
-		h.HandleUserLogin(w, r)
+		h.handleUserLogin(w, r)
 	}
 }
 
-func (h *DefaultApiHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	var authReq models.AuthRequest
 	err := r.ParseForm()
 	if err != nil {
@@ -221,7 +223,7 @@ func (h *DefaultApiHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	adminAuthData, err := h.ApiService.GetUserAdminLogin(authReq.Email, authReq.Password, helpers.GetIP(r))
+	adminAuthData, err := h.ApiService.GetAdminUserLogin(authReq.Email, authReq.Password, helpers.GetIP(r))
 	if err != nil {
 		var statusCode int
 		var message string
@@ -245,12 +247,12 @@ func (h *DefaultApiHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Requ
 
 	w.Header().Set("HX-Redirect", "/admin/dashboard")
 	res := `<div class="success">Login successful. Redirecting...</div>`
-	access_cookie := h.ApiService.BuildCookie("access_token", adminAuthData.AccessToken, models.CookieOptions{Path: "/admin"})
+	access_cookie := h.ApiService.BuildCookie("refresh_token", adminAuthData.AccessToken, models.CookieOptions{Path: "/"})
 	cookies := []*http.Cookie{access_cookie}
 	payload.Write(w, r, res, cookies)
 }
 
-func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 	var authReq models.AuthRequest
 	err := r.ParseForm()
 	if err != nil {
@@ -298,7 +300,7 @@ func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (h *DefaultApiHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -313,18 +315,59 @@ func (h *DefaultApiHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Re
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
-	}
-
-	if bearerToken == "" {
+	} else {
 		cookie, err := r.Cookie("refresh_token")
 		if err == nil {
-			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-			if err == nil {
-				bearerToken = string(decodedValue)
-			}
+			bearerToken = cookie.Value
 		}
 	}
 
+	isAdminClient := r.Header.Get("X-Admin-Request") == "true"
+
+	if isAdminClient {
+		h.handleAdminTokenRefresh(w, r, bearerToken)
+	} else {
+		h.handleUserTokenRefresh(w, r, bearerToken)
+	}
+}
+
+func (h *DefaultApiHandler) handleAdminTokenRefresh(w http.ResponseWriter, r *http.Request, bearerToken string) {
+	if bearerToken == "" {
+		err := errors.New("missing refresh token")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		message := `<div class="error">Missing refresh token</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	claims, err := h.ApiService.AuthenticateAdminUser(bearerToken, r)
+	if err != nil {
+		h.Logger.LogError(err)
+		message := `<div class="error">Failed authentication</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	token, err := h.ApiService.GenerateAdminSessionJWT(claims.User.UserID, claims.User.UserUUID, claims.Roles, helpers.GetIP(r))
+	if err != nil {
+		err := errors.New("failed generating jwt token")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		message := `<div class="error">Internal server error</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	res := models.RefreshRequestResponse{
+		UserID: claims.User.UserID,
+	}
+	access_cookie := h.ApiService.BuildCookie("refresh_token", token, models.CookieOptions{Path: "/", Expiration: models.Access})
+	cookies := []*http.Cookie{access_cookie}
+	payload.Write(w, r, res, cookies)
+}
+
+func (h *DefaultApiHandler) handleUserTokenRefresh(w http.ResponseWriter, r *http.Request, bearerToken string) {
 	if bearerToken == "" {
 		err := errors.New("missing refresh token")
 		h.Logger.LogError(err)
@@ -344,7 +387,7 @@ func (h *DefaultApiHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Re
 		res := models.RefreshRequestResponse{
 			UserID: userID,
 		}
-		access_cookie := h.ApiService.BuildCookie("access_token", accessToken, models.CookieOptions{Path: "/authapi", Expiration: models.Access})
+		access_cookie := h.ApiService.BuildCookie("access_token", accessToken, models.CookieOptions{Path: "/api", Expiration: models.Access})
 		cookies := []*http.Cookie{access_cookie}
 		payload.Write(w, r, res, cookies)
 	} else {
@@ -413,15 +456,13 @@ func (h *DefaultApiHandler) HandleUserData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if claims.User.UserID != userID {
-		err := errors.New("user id missmatch")
+	if claims.User.UserID != userID || claims.Type != "admin" {
+		err := errors.New("user doesn't have permissions to access this data")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 		return
 	}
-
-	// TODO handle case of admin in claims
 
 	data, err := h.ApiService.GetUserData(userID)
 	if err != nil {

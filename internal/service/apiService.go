@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/exp/slices"
 
+	"github.com/agusespa/a3n/internal/helpers"
 	"github.com/agusespa/a3n/internal/httperrors"
 	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
@@ -31,12 +32,14 @@ type ApiService interface {
 	PutUserPassword(username, password, newPassword string) (int64, error)
 	GetUserData(id int64) (models.UserData, error)
 	GetUserLogin(username, password string) (models.UserAuthData, error)
-	GetUserAdminLogin(username, password, ipAddr string) (models.UserAuthData, error)
+	GetAdminUserLogin(username, password, ipAddr string) (models.UserAuthData, error)
 	GetFreshAccessToken(refreshToken string) (string, int64, error)
 	DeleteToken(refreshToken string) error
 	DeleteAllTokens(refreshToken string) error
-	ValidateToken(token string) (*models.CustomClaims, error)
+	ValidateToken(token string) (models.CustomClaims, error)
 	BuildCookie(name, value string, options models.CookieOptions) *http.Cookie
+	GenerateAdminSessionJWT(userID int64, userUUID string, roles []string, ipAddr string) (string, error)
+	AuthenticateAdminUser(token string, r *http.Request) (models.CustomClaims, error)
 }
 
 type DefaultApiService struct {
@@ -251,7 +254,7 @@ func (as *DefaultApiService) GetUserLogin(username, password string) (models.Use
 	return userAuthData, err
 }
 
-func (as *DefaultApiService) GetUserAdminLogin(username, password, ipAddr string) (models.UserAuthData, error) {
+func (as *DefaultApiService) GetAdminUserLogin(username, password, ipAddr string) (models.UserAuthData, error) {
 	var userAuthData models.UserAuthData
 
 	userEntity, err := as.AuthRepo.ReadUserByEmail(username)
@@ -276,7 +279,7 @@ func (as *DefaultApiService) GetUserAdminLogin(username, password, ipAddr string
 		return userAuthData, err
 	}
 
-	accessToken, err := as.generateAdminSessionJWT(userEntity.UserID, userEntity.UserUUID, roles, ipAddr)
+	accessToken, err := as.GenerateAdminSessionJWT(userEntity.UserID, userEntity.UserUUID, roles, ipAddr)
 	if err != nil {
 		return userAuthData, err
 	}
@@ -304,7 +307,6 @@ func (as *DefaultApiService) GetUserData(id int64) (models.UserData, error) {
 }
 
 func (as *DefaultApiService) GetFreshAccessToken(refreshToken string) (string, int64, error) {
-
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
 		return "", -1, err
@@ -360,26 +362,24 @@ func (as *DefaultApiService) DeleteAllTokens(refreshToken string) error {
 	return nil
 }
 
-func (as *DefaultApiService) ValidateToken(token string) (*models.CustomClaims, error) {
+func (as *DefaultApiService) ValidateToken(token string) (models.CustomClaims, error) {
+	var claims models.CustomClaims
 	parsedToken, err := jwt.ParseWithClaims(
 		token,
-		&models.CustomClaims{},
+		&claims,
 		func(token *jwt.Token) (any, error) {
 			return as.EncryptionKey, nil
 		},
 	)
 	if err != nil {
 		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return &models.CustomClaims{}, err
+		return models.CustomClaims{}, httperrors.NewError(err, http.StatusUnauthorized)
 	}
 
-	claims, ok := parsedToken.Claims.(*models.CustomClaims)
-	if !ok {
-		err := errors.New("failed to parse token claims")
+	if !parsedToken.Valid {
+		err := errors.New("invalid token")
 		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return &models.CustomClaims{}, err
+		return models.CustomClaims{}, httperrors.NewError(err, http.StatusUnauthorized)
 	}
 
 	return claims, nil
@@ -420,8 +420,8 @@ func (as *DefaultApiService) generateAccessJWT(userID int64, userUUID string, ro
 	return tokenString, nil
 }
 
-func (as *DefaultApiService) generateAdminSessionJWT(userID int64, userUUID string, roles []string, ipAddr string) (string, error) {
-	accessExpiresBy := time.Now().Add(time.Duration(10) * time.Minute).Unix()
+func (as *DefaultApiService) GenerateAdminSessionJWT(userID int64, userUUID string, roles []string, ipAddr string) (string, error) {
+	accessExpiresBy := time.Now().Add(time.Duration(15) * time.Minute).Unix()
 	claims := models.CustomClaims{
 		User: models.TokenUser{
 			UserID:   userID,
@@ -512,7 +512,7 @@ func IsValidPassword(password string) bool {
 func (as *DefaultApiService) BuildCookie(name, value string, options models.CookieOptions) *http.Cookie {
 	cookie := http.Cookie{
 		Name:     name,
-		Value:    base64.URLEncoding.EncodeToString([]byte(value)),
+		Value:    value,
 		Path:     options.Path,
 		HttpOnly: true,
 	}
@@ -524,6 +524,32 @@ func (as *DefaultApiService) BuildCookie(name, value string, options models.Cook
 	case models.Refresh:
 		expiresBy := time.Now().Add(time.Duration(as.RefreshTokenExp) * time.Minute)
 		cookie.Expires = expiresBy
+	default:
+		expiresBy := time.Now().Add(time.Duration(15) * time.Minute)
+		cookie.Expires = expiresBy
 	}
 	return &cookie
+}
+
+func (s *DefaultApiService) AuthenticateAdminUser(token string, r *http.Request) (models.CustomClaims, error) {
+	claims, err := s.ValidateToken(token)
+	if err != nil {
+		return models.CustomClaims{}, err
+	}
+
+	if claims.IpAddr != helpers.GetIP(r) {
+		err := errors.New("invalid ip address")
+		s.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		return models.CustomClaims{}, err
+	}
+
+	if claims.Type != "admin" {
+		err := errors.New("invalid jwt claim")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		s.Logger.LogError(err)
+		return models.CustomClaims{}, err
+	}
+
+	return claims, nil
 }

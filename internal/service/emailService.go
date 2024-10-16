@@ -81,7 +81,7 @@ func (es *DefaultEmailService) BuildVerificationEmail(firstName, lastName, toAdd
 
 	emailTemplate := "<p>Follow this link to verify your email address:&nbsp;</p><a>" + link + "</a>"
 
-	tmplPath := filepath.Join("internal", "templates", "email_verify.html")
+	tmplPath := filepath.Join("templates", "email_verify.html")
 	tmpl, err := template.ParseFS(templatesFS, tmplPath)
 	if err == nil {
 		content := EmailContent{
