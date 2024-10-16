@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -311,7 +310,6 @@ func (h *DefaultApiHandler) HandleRefresh(w http.ResponseWriter, r *http.Request
 	}
 
 	bearerToken := ""
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
@@ -343,7 +341,6 @@ func (h *DefaultApiHandler) handleAdminTokenRefresh(w http.ResponseWriter, r *ht
 
 	claims, err := h.ApiService.AuthenticateAdminUser(bearerToken, r)
 	if err != nil {
-		h.Logger.LogError(err)
 		message := `<div class="error">Failed authentication</div>`
 		payload.WriteHTMLError(w, r, err, message)
 		return
@@ -410,19 +407,13 @@ func (h *DefaultApiHandler) HandleUserData(w http.ResponseWriter, r *http.Reques
 	}
 
 	bearerToken := ""
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
-	}
-
-	if bearerToken == "" {
-		cookie, err := r.Cookie("access_token")
+	} else {
+		cookie, err := r.Cookie("refresh_token")
 		if err == nil {
-			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-			if err == nil {
-				bearerToken = string(decodedValue)
-			}
+			bearerToken = cookie.Value
 		}
 	}
 
@@ -484,19 +475,13 @@ func (h *DefaultApiHandler) HandleUserEmailVerification(w http.ResponseWriter, r
 	}
 
 	bearerToken := ""
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
-	}
-
-	if bearerToken == "" {
-		cookie, err := r.Cookie("access_token")
+	} else {
+		cookie, err := r.Cookie("refresh_token")
 		if err == nil {
-			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-			if err == nil {
-				bearerToken = string(decodedValue)
-			}
+			bearerToken = cookie.Value
 		}
 	}
 
@@ -541,19 +526,13 @@ func (h *DefaultApiHandler) HandleUserAuthentication(w http.ResponseWriter, r *h
 	}
 
 	bearerToken := ""
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
-	}
-
-	if bearerToken == "" {
-		cookie, err := r.Cookie("access_token")
+	} else {
+		cookie, err := r.Cookie("refresh_token")
 		if err == nil {
-			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-			if err == nil {
-				bearerToken = string(decodedValue)
-			}
+			bearerToken = cookie.Value
 		}
 	}
 

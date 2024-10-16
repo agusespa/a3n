@@ -446,28 +446,20 @@ func (as *DefaultApiService) GenerateAdminSessionJWT(userID int64, userUUID stri
 }
 
 func (as *DefaultApiService) generateRefreshToken() (string, error) {
-	token := make([]byte, 96)
-	_, err := rand.Read(token)
+	tokenBytes := make([]byte, 32)
+	_, err := rand.Read(tokenBytes)
 	if err != nil {
 		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return "", err
+		return "", httperrors.NewError(err, http.StatusInternalServerError)
 	}
 
-	encodedToken := base64.StdEncoding.EncodeToString(token)
-	return encodedToken, nil
+	token := base64.URLEncoding.EncodeToString(tokenBytes)
+	return token, nil
 }
 
 func (as *DefaultApiService) hashRefreshToken(token string) ([]byte, error) {
-	decodedToken, err := base64.StdEncoding.DecodeString(token)
-	if err != nil {
-		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return nil, err
-	}
-
 	hasher := sha256.New()
-	hasher.Write(decodedToken)
+	hasher.Write([]byte(token))
 	hashedToken := hasher.Sum(nil)
 	return hashedToken, nil
 }
@@ -534,6 +526,8 @@ func (as *DefaultApiService) BuildCookie(name, value string, options models.Cook
 func (s *DefaultApiService) AuthenticateAdminUser(token string, r *http.Request) (models.CustomClaims, error) {
 	claims, err := s.ValidateToken(token)
 	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		s.Logger.LogError(err)
 		return models.CustomClaims{}, err
 	}
 
