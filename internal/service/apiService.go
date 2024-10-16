@@ -309,11 +309,11 @@ func (as *DefaultApiService) GetUserData(id int64) (models.UserData, error) {
 func (as *DefaultApiService) GetFreshAccessToken(refreshToken string) (string, int64, error) {
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		return "", -1, err
 	}
 	userEntity, err := as.AuthRepo.ReadUserByToken(refreshTokenHash)
 	if err != nil {
-		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		return "", -1, err
 	}
@@ -325,6 +325,7 @@ func (as *DefaultApiService) GetFreshAccessToken(refreshToken string) (string, i
 
 	accessToken, err := as.generateAccessJWT(userEntity.UserID, userEntity.UserUUID, roles)
 	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return "", -1, err
 	}
 

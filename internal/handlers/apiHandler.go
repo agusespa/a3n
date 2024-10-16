@@ -375,6 +375,7 @@ func (h *DefaultApiHandler) handleUserTokenRefresh(w http.ResponseWriter, r *htt
 
 	accessToken, userID, err := h.ApiService.GetFreshAccessToken(bearerToken)
 	if err != nil {
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
