@@ -19,18 +19,14 @@ type EmailService interface {
 }
 
 type DefaultEmailService struct {
-	Provider        string
-	Client          *sendgrid.Client
-	ClientDomain    string
-	SenderName      string
-	SenderAddr      string
-	Logo            string
-	PrimaryColor    string
-	SecondaryColor  string
-	FontColor       string
-	LinkColor       string
-	BackgroundColor string
-	Logger          logger.Logger
+	Provider     string
+	Client       *sendgrid.Client
+	ClientDomain string
+	SenderName   string
+	SenderAddr   string
+	// TODO
+	Logo   string
+	Logger logger.Logger
 }
 
 type EmailContent struct {
@@ -41,20 +37,14 @@ type EmailContent struct {
 	LinkColor       string
 }
 
-func NewDefaultEmailService(config models.Config, key string, logger logger.Logger) *DefaultEmailService {
+func NewDefaultEmailService(config models.ApiConfig, logger logger.Logger) *DefaultEmailService {
 	return &DefaultEmailService{
-		Provider:        config.Api.Email.Provider,
-		Client:          sendgrid.NewSendClient(key),
-		ClientDomain:    config.Api.Client.Domain,
-		SenderName:      config.Api.Email.Sender.Name,
-		SenderAddr:      config.Api.Email.Sender.Address,
-		Logo:            config.Branding.Logo,
-		PrimaryColor:    config.Branding.Colors.Primary,
-		SecondaryColor:  config.Branding.Colors.Secondary,
-		FontColor:       config.Branding.Colors.Font,
-		LinkColor:       config.Branding.Colors.Link,
-		BackgroundColor: config.Branding.Colors.Background,
-		Logger:          logger}
+		Provider:     config.Email.Provider,
+		Client:       sendgrid.NewSendClient(config.Email.ApiKey),
+		ClientDomain: config.Domain,
+		SenderName:   config.Email.Sender.Name,
+		SenderAddr:   config.Email.Sender.Address,
+		Logger:       logger}
 }
 
 func (es *DefaultEmailService) SendEmail(email *mail.SGMailV3) {
@@ -85,11 +75,8 @@ func (es *DefaultEmailService) BuildVerificationEmail(firstName, lastName, toAdd
 	tmpl, err := template.ParseFS(templatesFS, tmplPath)
 	if err == nil {
 		content := EmailContent{
-			Link:            link,
-			Logo:            es.Logo,
-			BackgroundColor: es.BackgroundColor,
-			FontColor:       es.FontColor,
-			LinkColor:       es.LinkColor,
+			Link: link,
+			Logo: es.Logo,
 		}
 
 		var body bytes.Buffer

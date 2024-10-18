@@ -45,8 +45,8 @@ type ApiService interface {
 type DefaultApiService struct {
 	AuthRepo        repository.AuthRepository
 	EncryptionKey   []byte
-	RefreshTokenExp int
-	AccessTokenExp  int
+	RefreshTokenExp int64
+	AccessTokenExp  int64
 	EmailSrv        EmailService
 	HardVerify      bool
 	Domain          string
@@ -54,14 +54,14 @@ type DefaultApiService struct {
 }
 
 func NewDefaultApiService(authRepo *repository.MySqlRepository, config models.ApiConfig, emailSrv EmailService, encryptionKey string, logger logger.Logger) *DefaultApiService {
-	var refreshExp int
+	var refreshExp int64
 	if config.Token.RefreshExp == 0 {
 		refreshExp = 525600 // defaults to a year
 	} else {
 		refreshExp = config.Token.RefreshExp
 	}
 
-	var accessExp int
+	var accessExp int64
 	if config.Token.AccessExp == 0 {
 		accessExp = 5 // default to 5 minutes
 	} else {
@@ -75,7 +75,7 @@ func NewDefaultApiService(authRepo *repository.MySqlRepository, config models.Ap
 		AccessTokenExp:  accessExp,
 		EmailSrv:        emailSrv,
 		HardVerify:      config.Email.HardVerify,
-		Domain:          config.Client.Domain,
+		Domain:          config.Domain,
 		Logger:          logger}
 }
 

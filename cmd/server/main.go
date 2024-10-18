@@ -2,8 +2,6 @@ package main
 
 import (
 	"embed"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -11,6 +9,7 @@ import (
 
 	"github.com/agusespa/a3n/internal/database"
 	"github.com/agusespa/a3n/internal/handlers"
+	"github.com/agusespa/a3n/internal/helpers"
 	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/repository"
@@ -44,45 +43,46 @@ func main() {
 	flag.Parse()
 	logg = logger.NewLogger(devFlag)
 
-	encryptionKey := os.Getenv("A3N_ENCRYPTION_KEY")
-	if encryptionKey == "" {
-		logg.LogFatal(errors.New("failed to get ENCRYPTION_KEY variable"))
-	}
-	dbPassword := os.Getenv("A3N_DB_PASSWORD")
-	if dbPassword == "" {
-		logg.LogFatal(errors.New("failed to get DB_PASSWORD variable"))
-	}
-	emailApiKey := os.Getenv("A3N_EMAIL_API_KEY")
-	if emailApiKey == "" {
-		logg.LogFatal(errors.New("failed to get EMAIL_API_KEY variable"))
+	encryptionKey, emailApiKey, err := helpers.GetApiKeyVars()
+	if err != nil {
+		logg.LogFatal(fmt.Errorf("failed to read env variables: %s", err.Error()))
 	}
 
-	var config models.Config
-	configData, err := configFile.ReadFile("config/config.json")
+	dbUser, dbAddr, dbPassword, err := helpers.GetDatabaseVars()
 	if err != nil {
-		logg.LogFatal(err)
+		logg.LogFatal(fmt.Errorf("failed to read env variables: %s", err.Error()))
 	}
-	err = json.Unmarshal(configData, &config)
-	if err != nil {
-		logg.LogFatal(err)
-	}
-
-	db, err := database.ConnectDB(config.Api.Database, dbPassword)
+	databaseConfig := models.Database{User: dbUser, Address: dbAddr, Password: dbPassword}
+	db, err := database.ConnectDB(databaseConfig)
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to establish database connection: %s", err.Error()))
 	}
 
 	authRepository := repository.NewMySqlRepository(db)
 
-	emailService := service.NewDefaultEmailService(config, emailApiKey, logg)
+	realmService := service.NewDefaultRealmService(authRepository, logg)
+	realmEntity, err := realmService.GetRealmById(1)
+	if err != nil {
+		logg.LogFatal(fmt.Errorf("failed to read realm settings: %s", err.Error()))
+	}
 
-	apiService := service.NewDefaultApiService(authRepository, config.Api, emailService, encryptionKey, logg)
+	tokenConfig := models.Token{RefreshExp: realmEntity.RefreshExp, AccessExp: realmEntity.AccessExp}
+
+	emailSender := models.Sender{Name: realmEntity.EmailSender, Address: realmEntity.EmailAddr}
+	emailConfig := models.Email{Provider: realmEntity.EmailProvider, Sender: emailSender, HardVerify: realmEntity.EmailVerify, ApiKey: emailApiKey}
+
+	apiConfig := models.ApiConfig{Domain: realmEntity.RealmDomain, Database: databaseConfig, Token: tokenConfig, Email: emailConfig}
+
+	emailService := service.NewDefaultEmailService(apiConfig, logg)
+
+	apiService := service.NewDefaultApiService(authRepository, apiConfig, emailService, encryptionKey, logg)
 
 	apiHandler := handlers.NewDefaultApiHandler(apiService, logg)
 
 	adminHandler := handlers.NewDefaultAdminHandler(apiService, logg)
 
 	mux := http.NewServeMux()
+	// mux.HandleFunc("/api/config", apiHandler.HandleSettings)
 	mux.HandleFunc("/api/register", apiHandler.HandleUserRegister)
 	mux.HandleFunc("/api/login", apiHandler.HandleLogin)
 	mux.HandleFunc("/api/user/email/verify", apiHandler.HandleUserEmailVerification)
@@ -104,7 +104,7 @@ func main() {
 
 	logg.LogInfo(fmt.Sprintf("Listening on port %v", port))
 
-	err = http.ListenAndServe(":"+port, corsMiddleware(mux, config.Api.Client.Domain))
+	err = http.ListenAndServe(":"+port, corsMiddleware(mux, realmEntity.RealmDomain))
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to start HTTP server: %s", err.Error()))
 	}

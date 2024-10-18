@@ -10,6 +10,7 @@ import (
 )
 
 type AuthRepository interface {
+	ReadRealmById(realmID int64) (models.RealmEntity, error)
 	CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error)
 	ReadUserByEmail(email string) (models.UserAuthEntity, error)
 	ReadUserById(userID int64) (models.UserAuthEntity, error)
@@ -28,6 +29,48 @@ type MySqlRepository struct {
 
 func NewMySqlRepository(db *sql.DB) *MySqlRepository {
 	return &MySqlRepository{DB: db}
+}
+
+func (repo *MySqlRepository) ReadRealmById(id int64) (models.RealmEntity, error) {
+	var realm models.RealmEntity
+
+	query := `
+		SELECT 
+			r.realm_id, 
+			r.realm_name, 
+			r.realm_domain, 
+			r.refresh_exp, 
+			r.access_exp,
+			r.email_verify, 
+			r.email_provider,
+			r.email_sender,
+			r.email_addr,
+		FROM realms r
+		WHERE r.realm_id = ?
+	`
+
+	row := repo.DB.QueryRow(query, id)
+	err := row.Scan(
+		&realm.RealmID,
+		&realm.RealmName,
+		&realm.RealmDomain,
+		&realm.RefreshExp,
+		&realm.AccessExp,
+		&realm.EmailVerify,
+		&realm.EmailProvider,
+		&realm.EmailSender,
+		&realm.EmailAddr,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			err = httperrors.NewError(err, http.StatusNotFound)
+			return realm, err
+		}
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		return realm, err
+	}
+
+	return realm, nil
 }
 
 func (repo *MySqlRepository) CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error) {
