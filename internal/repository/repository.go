@@ -44,7 +44,7 @@ func (repo *MySqlRepository) ReadRealmById(id int64) (models.RealmEntity, error)
 			r.email_verify, 
 			r.email_provider,
 			r.email_sender,
-			r.email_addr,
+			r.email_addr
 		FROM realms r
 		WHERE r.realm_id = ?
 	`

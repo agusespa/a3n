@@ -6,15 +6,19 @@ import (
 	"github.com/agusespa/a3n/mocks"
 )
 
-func TestReadRealmByIdWithValidId(t *testing.T) {
-	rs := &DefaultRealmService{
+func setupRealmService() *DefaultRealmService {
+	return &DefaultRealmService{
 		AuthRepo: mocks.NewMockAuthRepository(),
 		Logger:   mocks.NewMockLogger(true),
 	}
+}
+
+func TestGetRealmByIdWithValidId(t *testing.T) {
+	rs := setupRealmService()
 
 	realm, err := rs.GetRealmById(1)
 	if err != nil {
-		t.Errorf("failed to read realm by valid id: %s", err)
+		t.Errorf("failed to get realm by valid id: %s", err)
 	}
 
 	expectedName := "browser"
@@ -27,11 +31,8 @@ func TestReadRealmByIdWithValidId(t *testing.T) {
 	}
 }
 
-func TestReadRealmByIdWithInvalidId(t *testing.T) {
-	rs := &DefaultRealmService{
-		AuthRepo: mocks.NewMockAuthRepository(),
-		Logger:   mocks.NewMockLogger(true),
-	}
+func TestGetRealmByIdWithInvalidId(t *testing.T) {
+	rs := setupRealmService()
 
 	_, err := rs.GetRealmById(0)
 	if err == nil {
@@ -39,11 +40,8 @@ func TestReadRealmByIdWithInvalidId(t *testing.T) {
 	}
 }
 
-func TestReadRealmByIdWithInvalidData(t *testing.T) {
-	rs := &DefaultRealmService{
-		AuthRepo: mocks.NewMockAuthRepository(),
-		Logger:   mocks.NewMockLogger(true),
-	}
+func TestGetRealmByIdWithInvalidData(t *testing.T) {
+	rs := setupRealmService()
 
 	_, err := rs.GetRealmById(2)
 
