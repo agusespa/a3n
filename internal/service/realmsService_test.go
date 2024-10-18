@@ -9,9 +9,10 @@ import (
 func TestReadRealmByIdWithValidId(t *testing.T) {
 	rs := &DefaultRealmService{
 		AuthRepo: mocks.NewMockAuthRepository(),
+		Logger:   mocks.NewMockLogger(true),
 	}
 
-	realm, err := rs.AuthRepo.ReadRealmById(1)
+	realm, err := rs.GetRealmById(1)
 	if err != nil {
 		t.Errorf("failed to read realm by valid id: %s", err)
 	}
@@ -29,10 +30,29 @@ func TestReadRealmByIdWithValidId(t *testing.T) {
 func TestReadRealmByIdWithInvalidId(t *testing.T) {
 	rs := &DefaultRealmService{
 		AuthRepo: mocks.NewMockAuthRepository(),
+		Logger:   mocks.NewMockLogger(true),
 	}
 
-	_, err := rs.AuthRepo.ReadRealmById(0)
+	_, err := rs.GetRealmById(0)
 	if err == nil {
-		t.Errorf("failed to return error due to invalid id")
+		t.Fatalf("Expected an error, got nil")
+	}
+}
+
+func TestReadRealmByIdWithInvalidData(t *testing.T) {
+	rs := &DefaultRealmService{
+		AuthRepo: mocks.NewMockAuthRepository(),
+		Logger:   mocks.NewMockLogger(true),
+	}
+
+	_, err := rs.GetRealmById(2)
+
+	if err == nil {
+		t.Fatalf("Expected an error, got nil")
+	}
+
+	expectedMessage := "RealmName cannot be empty"
+	if err.Error() != expectedMessage {
+		t.Errorf("Expected error message to be '%s', got '%s'", expectedMessage, err.Error())
 	}
 }

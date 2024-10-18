@@ -26,7 +26,7 @@ var mockUser = models.UserAuthEntity{
 	CreatedAt:     time.Now(),
 }
 
-var mockRealm = models.RealmEntity{
+var mockValidRealm = models.RealmEntity{
 	RealmID:       1,
 	RealmName:     "browser",
 	RealmDomain:   "localhost:9001",
@@ -38,9 +38,16 @@ var mockRealm = models.RealmEntity{
 	EmailAddr:     "help@mail.com",
 }
 
+var mockInvalidRealm = models.RealmEntity{
+	RealmID: 2,
+}
+
 func (m *MockAuthRepository) ReadRealmById(realmID int64) (models.RealmEntity, error) {
-	if realmID == mockRealm.RealmID {
-		return mockRealm, nil
+	if realmID == mockValidRealm.RealmID {
+		return mockValidRealm, nil
+	}
+	if realmID == mockInvalidRealm.RealmID {
+		return mockInvalidRealm, nil
 	}
 	return models.RealmEntity{}, httperrors.NewError(errors.New("realm not found"), http.StatusNotFound)
 }

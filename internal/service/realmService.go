@@ -39,9 +39,6 @@ func (rs *DefaultRealmService) GetRealmById(realmID int64) (models.RealmEntity, 
 }
 
 func validateRealm(r models.RealmEntity) error {
-	if r.RealmID == 0 {
-		return fmt.Errorf("RealmID cannot be zero")
-	}
 	if r.RealmName == "" {
 		return fmt.Errorf("RealmName cannot be empty")
 	}
