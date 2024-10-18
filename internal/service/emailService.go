@@ -24,9 +24,8 @@ type DefaultEmailService struct {
 	ClientDomain string
 	SenderName   string
 	SenderAddr   string
-	// TODO
-	Logo   string
-	Logger logger.Logger
+	Logo         string
+	Logger       logger.Logger
 }
 
 type EmailContent struct {
@@ -44,6 +43,7 @@ func NewDefaultEmailService(config models.ApiConfig, logger logger.Logger) *Defa
 		ClientDomain: config.Domain,
 		SenderName:   config.Email.Sender.Name,
 		SenderAddr:   config.Email.Sender.Address,
+		Logo:         "https://github.com/agusespa/a3n/blob/main/config/assets/logo.png?raw=true",
 		Logger:       logger}
 }
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"embed"
 	"flag"
 	"fmt"
 	"net/http"
@@ -33,9 +32,6 @@ func corsMiddleware(next http.Handler, domain string) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-//go:embed config/config.json
-var configFile embed.FS
 
 func main() {
 	var devFlag bool
