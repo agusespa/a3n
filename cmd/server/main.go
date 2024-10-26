@@ -64,8 +64,8 @@ func main() {
 
 	tokenConfig := models.Token{RefreshExp: realmEntity.RefreshExp, AccessExp: realmEntity.AccessExp}
 
-	emailSender := models.Sender{Name: realmEntity.EmailSender, Address: realmEntity.EmailAddr}
-	emailConfig := models.Email{Provider: realmEntity.EmailProvider, Sender: emailSender, HardVerify: realmEntity.EmailVerify, ApiKey: emailApiKey}
+	emailSender := models.Sender{Name: realmEntity.EmailSender.String, Address: realmEntity.EmailAddr.String}
+	emailConfig := models.Email{Provider: realmEntity.EmailProvider.String, Sender: emailSender, HardVerify: realmEntity.EmailVerify, ApiKey: emailApiKey}
 
 	apiConfig := models.ApiConfig{Domain: realmEntity.RealmDomain, Database: databaseConfig, Token: tokenConfig, Email: emailConfig}
 
@@ -78,7 +78,7 @@ func main() {
 	adminHandler := handlers.NewDefaultAdminHandler(apiService, logg)
 
 	mux := http.NewServeMux()
-	// mux.HandleFunc("/api/config", apiHandler.HandleSettings)
+	mux.HandleFunc("/api/realm", apiHandler.HandleRealm)
 	mux.HandleFunc("/api/register", apiHandler.HandleUserRegister)
 	mux.HandleFunc("/api/login", apiHandler.HandleLogin)
 	mux.HandleFunc("/api/user/email/verify", apiHandler.HandleUserEmailVerification)
@@ -90,8 +90,11 @@ func main() {
 	mux.HandleFunc("/api/logout/all", apiHandler.HandleAllUserTokensRevocation)
 	mux.HandleFunc("/api/logout", apiHandler.HandleTokenRevocation)
 
-	mux.HandleFunc("/admin/dashboard", adminHandler.HandleAdminDashboard)
 	mux.HandleFunc("/admin/login", adminHandler.HandleAdminLogin)
+	// mux.HandleFunc("/admin/dashboard/users", adminHandler.HandleAdminUsers)
+	mux.HandleFunc("/admin/dashboard/settings", adminHandler.HandleAdminSettings)
+	mux.HandleFunc("/admin/dashboard/actions", adminHandler.HandleAdminActions)
+	mux.HandleFunc("/admin/dashboard", adminHandler.HandleAdminDashboard)
 
 	port := os.Getenv("A3N_PORT")
 	if port == "" {

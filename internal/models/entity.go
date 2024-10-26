@@ -6,15 +6,15 @@ import (
 )
 
 type RealmEntity struct {
-	RealmID       int64  `db:"realm_id"`
-	RealmName     string `db:"realm_name"`
-	RealmDomain   string `db:"realm_domain"`
-	RefreshExp    int64  `db:"refresh_exp"`
-	AccessExp     int64  `db:"access_exp"`
-	EmailVerify   bool   `db:"email_verify"`
-	EmailProvider string `db:"email_provider"`
-	EmailSender   string `db:"email_sender"`
-	EmailAddr     string `db:"email_addr"`
+	RealmID       int64          `db:"realm_id"`
+	RealmName     string         `db:"realm_name"`
+	RealmDomain   string         `db:"realm_domain"`
+	RefreshExp    int64          `db:"refresh_exp"`
+	AccessExp     int64          `db:"access_exp"`
+	EmailVerify   bool           `db:"email_verify"`
+	EmailProvider sql.NullString `db:"email_provider"`
+	EmailSender   sql.NullString `db:"email_sender"`
+	EmailAddr     sql.NullString `db:"email_addr"`
 }
 
 type UserAuthEntity struct {

@@ -45,6 +45,7 @@
                 text-decoration: none;
                 color: #fff;
                 border-bottom: 1px solid #333;
+                cursor: pointer;
             }
 
             .sidebar nav a:hover {
@@ -84,10 +85,38 @@
             button:hover {
                 background-color: #222;
             }
+            .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+            margin-bottom: 0.5rem;
+        }
+        input[type="text"],
+        input[type="number"] {
+            width: 300px;
+            padding: 0.5rem;
+        }
+        input[type="checkbox"] {
+            margin-left: 150px;
+        }
+        .submit-btn {
+            margin-left: 150px;
+            padding: 0.5rem 1rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .submit-btn:hover {
+            background-color: #0056b3;
+        }
         </style>
 
         <script>
-            const t = 60000;
+            const t = 600000;
             let lastActivityTime = Date.now();
 
             function resetActivityTimer() {
@@ -119,32 +148,21 @@
 
     <body>
         <div class="container">
-            <aside class="sidebar">
+            <nav class="sidebar">
                 <h1>a3n</h1>
                 <nav>
-                    <a href="/dashboard">Dashboard</a>
-                    <a href="/users">Users</a>
-                    <a href="/roles">Roles</a>
-                    <a href="/settings">Settings</a>
+                    <a hx-get="/admin/dashboard/actions" hx-target="#main" hx-swap="innerHTML" hx-push-url="true">Dashboard</a>
+                    <a hx-get="/admin/dashboard/settings" hx-target="#main" hx-swap="innerHTML" hx-push-url="true">Settings</a>
+                    <a hx-get="/admin/dashboard/users" hx-target="#main" hx-swap="innerHTML" hx-push-url="true">Users</a>
+                    <a hx-get="/admin/dashboard/roles" hx-target="#main" hx-swap="innerHTML" hx-push-url="true">Roles</a>
                 </nav>
                 <div class="user-section">
                     <strong>{{ .FirstName }}</strong>
-                    <a href="/admin/logout">Logout</a>
+                    <a href="/admin/login" href="logout">Logout</a>
                 </div>
-            </aside>
-            <main class="main-content">
-                <div class="grid">
-                    <div class="card">
-                        <h3>Quick Actions</h3>
-                        <button hx-post="/api/create-user" hx-target="#result">
-                            Create User
-                        </button>
-                        <button hx-post="/api/create-role" hx-target="#result">
-                            Create Role
-                        </button>
-                        <div id="result"></div>
-                    </div>
-                </div>
+            </nav>
+
+            <main id="main" class="main-content" hx-get="/admin/dashboard/actions" hx-trigger="load" hx-swap="innerHTML">
             </main>
         </div>
     </body>

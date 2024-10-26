@@ -51,7 +51,7 @@ func validateRealm(r models.RealmEntity) error {
 	if r.AccessExp <= 0 {
 		return fmt.Errorf("AccessExp must be greater than zero")
 	}
-	if r.EmailVerify && (r.EmailProvider == "" || r.EmailSender == "" || r.EmailAddr == "") {
+	if r.EmailVerify && (r.EmailProvider.String == "" || r.EmailSender.String == "" || r.EmailAddr.String == "") {
 		return fmt.Errorf("EmailProvider, EmailSender, and EmailAddr must be set when email verification is enabled")
 	}
 	return nil

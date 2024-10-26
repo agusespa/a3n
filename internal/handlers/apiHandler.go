@@ -17,6 +17,7 @@ import (
 )
 
 type ApiHandler interface {
+	HandleRealm(w http.ResponseWriter, r *http.Request)
 	HandleUserRegister(w http.ResponseWriter, r *http.Request)
 	HandleUserEmailChange(w http.ResponseWriter, r *http.Request)
 	HandleUserPasswordChange(w http.ResponseWriter, r *http.Request)
@@ -39,6 +40,53 @@ type DefaultApiHandler struct {
 
 func NewDefaultApiHandler(apiService service.ApiService, logger logger.Logger) *DefaultApiHandler {
 	return &DefaultApiHandler{ApiService: apiService, Logger: logger}
+}
+
+func (h *DefaultApiHandler) HandleRealm(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
+	if r.Method != http.MethodPost {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	var userReq models.UserRequest
+	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if userReq.FirstName == "" || userReq.LastName == "" {
+		err := errors.New("name not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if userReq.Email == "" || userReq.Password == "" {
+		err := errors.New("missing credentials")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	id, err := h.ApiService.PostUser(userReq)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	res := models.RegistrationResponse{
+		UserID: id,
+	}
+
+	payload.Write(w, r, res, nil)
 }
 
 func (h *DefaultApiHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
