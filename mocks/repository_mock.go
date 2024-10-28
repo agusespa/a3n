@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"time"
@@ -33,9 +34,9 @@ var mockValidRealm = models.RealmEntity{
 	RefreshExp:    1440,
 	AccessExp:     5,
 	EmailVerify:   true,
-	EmailProvider: "sendgrid",
-	EmailSender:   "helpdesk",
-	EmailAddr:     "help@mail.com",
+	EmailProvider: sql.NullString{String: "sendgrid", Valid: true},
+	EmailSender:   sql.NullString{String: "helpdesk", Valid: true},
+	EmailAddr:     sql.NullString{String: "help@mail.com", Valid: true},
 }
 
 var mockInvalidRealm = models.RealmEntity{
