@@ -106,11 +106,13 @@ func (h *DefaultApiHandler) HandleRealm(w http.ResponseWriter, r *http.Request) 
 
 	err = h.RealmService.PutRealm(realmReq)
 	if err != nil {
-		payload.WriteError(w, r, err)
+		message := `<div class="error">There was an error updating the realm</div>`
+		payload.WriteHTMLError(w, r, err, message)
 		return
 	}
 
-	payload.Write(w, r, nil, nil)
+	message := `<div class="success">Update successful</div>`
+	payload.Write(w, r, message, nil)
 }
 
 func (h *DefaultApiHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
