@@ -53,6 +53,10 @@ func (m *MockAuthRepository) ReadRealmById(realmID int64) (models.RealmEntity, e
 	return models.RealmEntity{}, httperrors.NewError(errors.New("realm not found"), http.StatusNotFound)
 }
 
+func (m *MockAuthRepository) UpdateRealm(realm models.RealmEntity) error {
+	return nil
+}
+
 func (m *MockAuthRepository) CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error) {
 	return 1, nil
 }

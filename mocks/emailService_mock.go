@@ -1,8 +1,6 @@
 package mocks
 
 import (
-	"github.com/agusespa/a3n/internal/logger"
-	"github.com/agusespa/a3n/internal/models"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
@@ -17,7 +15,7 @@ type MockEmailService struct {
 	BuildVerificationEmailResult    mail.SGMailV3
 }
 
-func NewMockEmailService(config models.ApiConfig, key string, logger logger.FileLogger) *MockEmailService {
+func NewMockEmailService() *MockEmailService {
 	return &MockEmailService{}
 }
 
