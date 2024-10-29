@@ -73,7 +73,7 @@ func main() {
 
 	apiService := service.NewDefaultApiService(authRepository, apiConfig, emailService, encryptionKey, logg)
 
-	apiHandler := handlers.NewDefaultApiHandler(apiService, logg)
+	apiHandler := handlers.NewDefaultApiHandler(apiService, realmService, logg)
 
 	adminHandler := handlers.NewDefaultAdminHandler(apiService, logg)
 
@@ -91,7 +91,6 @@ func main() {
 	mux.HandleFunc("/api/logout", apiHandler.HandleTokenRevocation)
 
 	mux.HandleFunc("/admin/login", adminHandler.HandleAdminLogin)
-	// mux.HandleFunc("/admin/dashboard/users", adminHandler.HandleAdminUsers)
 	mux.HandleFunc("/admin/dashboard/settings", adminHandler.HandleAdminSettings)
 	mux.HandleFunc("/admin/dashboard/actions", adminHandler.HandleAdminActions)
 	mux.HandleFunc("/admin/dashboard", adminHandler.HandleAdminDashboard)

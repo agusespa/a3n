@@ -11,6 +11,7 @@ import (
 
 type AuthRepository interface {
 	ReadRealmById(realmID int64) (models.RealmEntity, error)
+	UpdateRealm(realm models.RealmEntity) error
 	CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error)
 	ReadUserByEmail(email string) (models.UserAuthEntity, error)
 	ReadUserById(userID int64) (models.UserAuthEntity, error)
@@ -195,20 +196,46 @@ func (repo *MySqlRepository) ReadUserById(id int64) (models.UserAuthEntity, erro
 }
 
 func (repo *MySqlRepository) UpdateUserEmailVerification(email string) error {
-	result, err := repo.DB.Exec("UPDATE users SET email_verified = ? WHERE email = ?", true, email)
+	_, err := repo.DB.Exec("UPDATE users SET email_verified = ? WHERE email = ?", true, email)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return err
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return err
-	}
+	return nil
+}
 
-	if rowsAffected == 0 {
-		err = httperrors.NewError(err, http.StatusBadRequest)
+func (repo *MySqlRepository) UpdateRealm(realm models.RealmEntity) error {
+	query := `
+		UPDATE realms SET 
+			realm_name = ?, 
+			realm_domain = ?, 
+			refresh_exp = ?, 
+			access_exp = ?, 
+			email_verify = ?, 
+			email_provider = ?, 
+			email_sender = ?, 
+			email_addr = ?
+		WHERE realm_id = ?
+	`
+
+	_, err := repo.DB.Exec(query,
+		realm.RealmName,
+		realm.RealmDomain,
+		realm.RefreshExp,
+		realm.AccessExp,
+		realm.EmailVerify,
+		realm.EmailProvider,
+		realm.EmailSender,
+		realm.EmailAddr,
+		realm.RealmID,
+	)
+	if err != nil {
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1064 {
+			err = httperrors.NewError(err, http.StatusBadRequest)
+			return err
+		}
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return err
 	}
 
@@ -216,7 +243,7 @@ func (repo *MySqlRepository) UpdateUserEmailVerification(email string) error {
 }
 
 func (repo *MySqlRepository) UpdateUserEmail(userID int64, email string) (int64, error) {
-	result, err := repo.DB.Exec("UPDATE users SET email = ? WHERE user_id = ?", email, userID)
+	_, err := repo.DB.Exec("UPDATE users SET email = ? WHERE user_id = ?", email, userID)
 	if err != nil {
 		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1064 {
 			err = httperrors.NewError(err, http.StatusBadRequest)
@@ -226,35 +253,13 @@ func (repo *MySqlRepository) UpdateUserEmail(userID int64, email string) (int64,
 		return 0, err
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return 0, err
-	}
-
-	if rowsAffected == 0 {
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		return 0, err
-	}
-
 	return userID, nil
 }
 
 func (repo *MySqlRepository) UpdateUserPassword(userID int64, hashedPassword *[]byte) (int64, error) {
-	result, err := repo.DB.Exec("UPDATE users SET password_hash = ? WHERE user_id = ?", *hashedPassword, userID)
+	_, err := repo.DB.Exec("UPDATE users SET password_hash = ? WHERE user_id = ?", *hashedPassword, userID)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return 0, err
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return 0, err
-	}
-
-	if rowsAffected == 0 {
-		err = httperrors.NewError(err, http.StatusBadRequest)
 		return 0, err
 	}
 

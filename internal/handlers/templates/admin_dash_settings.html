@@ -1,43 +1,88 @@
-<form method="POST" action="/api/admin/realm">
-        <div class="form-group">
-            <label for="realm_name">Realm Name:</label>
-            <input type="text" id="realm_name" name="realm_name" value="{{.RealmName}}" required>
-        </div>
+<form hx-put="/api/realm" hx-trigger="submit">
+    <div class="form-group">
+        <label for="realm_name">Realm Name:</label>
+        <input
+            type="text"
+            id="realm_name"
+            name="realm_name"
+            value="{{.RealmName}}"
+            required
+        />
+    </div>
 
-        <div class="form-group">
-            <label for="realm_domain">Realm Domain:</label>
-            <input type="text" id="realm_domain" name="realm_domain" value="{{.RealmDomain}}" required>
-        </div>
+    <div class="form-group">
+        <label for="realm_domain">Realm Domain:</label>
+        <input
+            type="text"
+            id="realm_domain"
+            name="realm_domain"
+            value="{{.RealmDomain}}"
+            required
+        />
+    </div>
 
-        <div class="form-group">
-            <label for="refresh_exp">Refresh Expiration (min.):</label>
-            <input type="number" id="refresh_exp" name="refresh_exp" value="{{.RefreshExp}}" required>
-        </div>
+    <div class="form-group">
+        <label for="refresh_exp">Refresh Expiration (min.):</label>
+        <input
+            type="number"
+            id="refresh_exp"
+            name="refresh_exp"
+            value="{{.RefreshExp}}"
+            required
+        />
+    </div>
 
-        <div class="form-group">
-            <label for="access_exp">Access Expiration (min.):</label>
-            <input type="number" id="access_exp" name="access_exp" value="{{.AccessExp}}" required>
-        </div>
+    <div class="form-group">
+        <label for="access_exp">Access Expiration (min.):</label>
+        <input
+            type="number"
+            id="access_exp"
+            name="access_exp"
+            value="{{.AccessExp}}"
+            required
+        />
+    </div>
 
-        <div class="form-group">
-            <input type="checkbox" id="email_verify" name="email_verify" {{if .EmailVerify}}checked{{end}}>
-            <label for="email_verify">Email Verification Required</label>
-        </div>
+    <div class="form-group">
+        <input
+            type="checkbox"
+            id="email_verify"
+            name="email_verify"
+            {{if
+            .EmailVerify}}checked{{end}}
+        />
+        <label for="email_verify">Email Verification Required</label>
+    </div>
 
-        <div class="form-group">
-            <label for="email_provider">Email Provider:</label>
-            <input type="text" id="email_provider" name="email_provider" value="{{if .EmailProvider.Valid}}{{.EmailProvider.String}}{{end}}">
-        </div>
+    <div class="form-group">
+        <label for="email_provider">Email Provider:</label>
+        <input
+            type="text"
+            id="email_provider"
+            name="email_provider"
+            value="{{if .EmailProvider.Valid}}{{.EmailProvider.String}}{{end}}"
+        />
+    </div>
 
-        <div class="form-group">
-            <label for="email_sender">Email Sender:</label>
-            <input type="text" id="email_sender" name="email_sender" value="{{if .EmailSender.Valid}}{{.EmailSender.String}}{{end}}">
-        </div>
+    <div class="form-group">
+        <label for="email_sender">Email Sender:</label>
+        <input
+            type="text"
+            id="email_sender"
+            name="email_sender"
+            value="{{if .EmailSender.Valid}}{{.EmailSender.String}}{{end}}"
+        />
+    </div>
 
-        <div class="form-group">
-            <label for="email_addr">Email Address:</label>
-            <input type="email" id="email_addr" name="email_addr" value="{{if .EmailAddr.Valid}}{{.EmailAddr.String}}{{end}}">
-        </div>
+    <div class="form-group">
+        <label for="email_addr">Email Address:</label>
+        <input
+            type="email"
+            id="email_addr"
+            name="email_addr"
+            value="{{if .EmailAddr.Valid}}{{.EmailAddr.String}}{{end}}"
+        />
+    </div>
 
-        <button type="submit" class="submit-btn">Save</button>
+    <button type="submit" class="submit-btn">Save</button>
 </form>

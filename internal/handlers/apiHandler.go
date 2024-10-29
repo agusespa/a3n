@@ -34,59 +34,83 @@ type ApiHandler interface {
 }
 
 type DefaultApiHandler struct {
-	ApiService service.ApiService
-	Logger     logger.Logger
+	ApiService   service.ApiService
+	RealmService service.RealmService
+	Logger       logger.Logger
 }
 
-func NewDefaultApiHandler(apiService service.ApiService, logger logger.Logger) *DefaultApiHandler {
-	return &DefaultApiHandler{ApiService: apiService, Logger: logger}
+func NewDefaultApiHandler(apiService service.ApiService, realmService service.RealmService, logger logger.Logger) *DefaultApiHandler {
+	return &DefaultApiHandler{ApiService: apiService, RealmService: realmService, Logger: logger}
 }
 
 func (h *DefaultApiHandler) HandleRealm(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodPut {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	var userReq models.UserRequest
-	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
+	err := r.ParseForm()
+	if err != nil {
 		err = httperrors.NewError(err, http.StatusBadRequest)
 		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	if userReq.FirstName == "" || userReq.LastName == "" {
-		err := errors.New("name not provided")
+	realmReq := models.RealmRequest{}
+
+	realmReq.RealmName = r.Form.Get("realm_name")
+	if realmReq.RealmName == "" {
+		err := errors.New("realm name not provided")
 		err = httperrors.NewError(err, http.StatusBadRequest)
 		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	if userReq.Email == "" || userReq.Password == "" {
-		err := errors.New("missing credentials")
-		err = httperrors.NewError(err, http.StatusUnauthorized)
+	realmReq.RealmDomain = r.Form.Get("realm_domain")
+	if realmReq.RealmDomain == "" {
+		err := errors.New("realm domain not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
 		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	id, err := h.ApiService.PostUser(userReq)
+	realmReq.RefreshExp = r.Form.Get("refresh_exp")
+	if realmReq.RefreshExp == "" {
+		err := errors.New("refresh token expiration not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	realmReq.AccessExp = r.Form.Get("access_exp")
+	if realmReq.AccessExp == "" {
+		err := errors.New("access token expiration not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	realmReq.EmailVerify = r.Form.Get("email_verify")
+	realmReq.EmailSender = r.Form.Get("email_sender")
+	realmReq.EmailProvider = r.Form.Get("email_provider")
+	realmReq.EmailAddr = r.Form.Get("email_addr")
+
+	err = h.RealmService.PutRealm(realmReq)
 	if err != nil {
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	res := models.RegistrationResponse{
-		UserID: id,
-	}
-
-	payload.Write(w, r, res, nil)
+	payload.Write(w, r, nil, nil)
 }
 
 func (h *DefaultApiHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {

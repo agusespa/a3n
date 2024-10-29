@@ -1,8 +1,12 @@
 package service
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 
+	"github.com/agusespa/a3n/internal/helpers"
+	"github.com/agusespa/a3n/internal/httperrors"
 	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/repository"
@@ -15,6 +19,7 @@ type DefaultRealmService struct {
 
 type RealmService interface {
 	GetRealmById(id int64) (models.RealmEntity, error)
+	PutRealm(req models.RealmRequest) error
 }
 
 func NewDefaultRealmService(authRepo *repository.MySqlRepository, logger logger.Logger) *DefaultRealmService {
@@ -35,7 +40,65 @@ func (rs *DefaultRealmService) GetRealmById(realmID int64) (models.RealmEntity, 
 		return models.RealmEntity{}, err
 	}
 
+	if realm.EmailVerify && (realm.EmailProvider.String == "" || realm.EmailSender.String == "" || realm.EmailAddr.String == "") {
+		err := errors.New("EmailProvider, EmailSender, and EmailAddr must be set when email verification is enabled")
+		rs.Logger.LogError(err)
+		realm.EmailVerify = false
+	}
+
 	return realm, nil
+}
+
+func (rs *DefaultRealmService) PutRealm(req models.RealmRequest) error {
+	if req.EmailAddr != "" {
+		if !IsValidEmail(req.EmailAddr) {
+			err := errors.New("not a valid email address")
+			err = httperrors.NewError(err, http.StatusBadRequest)
+			rs.Logger.LogError(err)
+			return err
+		}
+	}
+
+	refreshExp, err := helpers.StringToInt64(req.RefreshExp)
+	if err != nil {
+		err := errors.New("not a valid refresh expiration value")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		rs.Logger.LogError(err)
+		return err
+	}
+
+	accessExp, err := helpers.StringToInt64(req.AccessExp)
+	if err != nil {
+		err := errors.New("not a valid access expiration value")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		rs.Logger.LogError(err)
+		return err
+	}
+
+	emailAddr := helpers.ParseNullString(req.EmailAddr)
+	emailProvider := helpers.ParseNullString(req.EmailProvider)
+	emailSender := helpers.ParseNullString(req.EmailSender)
+	emailVerify := req.EmailVerify == "on"
+
+	realm := models.RealmEntity{
+		RealmID:       1,
+		RealmName:     req.RealmName,
+		RealmDomain:   req.RealmDomain,
+		RefreshExp:    refreshExp,
+		AccessExp:     accessExp,
+		EmailVerify:   emailVerify,
+		EmailAddr:     emailAddr,
+		EmailProvider: emailProvider,
+		EmailSender:   emailSender,
+	}
+
+	err = rs.AuthRepo.UpdateRealm(realm)
+	if err != nil {
+		rs.Logger.LogError(err)
+		return err
+	}
+
+	return nil
 }
 
 func validateRealm(r models.RealmEntity) error {
@@ -50,9 +113,6 @@ func validateRealm(r models.RealmEntity) error {
 	}
 	if r.AccessExp <= 0 {
 		return fmt.Errorf("AccessExp must be greater than zero")
-	}
-	if r.EmailVerify && (r.EmailProvider.String == "" || r.EmailSender.String == "" || r.EmailAddr.String == "") {
-		return fmt.Errorf("EmailProvider, EmailSender, and EmailAddr must be set when email verification is enabled")
 	}
 	return nil
 }
