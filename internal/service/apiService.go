@@ -44,40 +44,20 @@ type ApiService interface {
 }
 
 type DefaultApiService struct {
-	AuthRepo        repository.AuthRepository
-	EncryptionKey   []byte
-	RefreshTokenExp int64
-	AccessTokenExp  int64
-	EmailSrv        EmailService
-	HardVerify      bool
-	Domain          string
-	Logger          logger.Logger
+	AuthRepo      repository.AuthRepository
+	Config        ConfigService
+	EncryptionKey []byte
+	EmailSrv      EmailService
+	Logger        logger.Logger
 }
 
-func NewDefaultApiService(authRepo *repository.MySqlRepository, config models.ApiConfig, emailSrv EmailService, encryptionKey string, logger logger.Logger) *DefaultApiService {
-	var refreshExp int64
-	if config.Token.RefreshExp == 0 {
-		refreshExp = 525600 // defaults to a year
-	} else {
-		refreshExp = config.Token.RefreshExp
-	}
-
-	var accessExp int64
-	if config.Token.AccessExp == 0 {
-		accessExp = 5 // default to 5 minutes
-	} else {
-		accessExp = config.Token.AccessExp
-	}
-
+func NewDefaultApiService(authRepo *repository.MySqlRepository, config *DefaultConfigService, emailSrv EmailService, encryptionKey string, logger logger.Logger) *DefaultApiService {
 	return &DefaultApiService{
-		AuthRepo:        authRepo,
-		EncryptionKey:   []byte(encryptionKey),
-		RefreshTokenExp: refreshExp,
-		AccessTokenExp:  accessExp,
-		EmailSrv:        emailSrv,
-		HardVerify:      config.Email.HardVerify,
-		Domain:          config.Domain,
-		Logger:          logger}
+		AuthRepo:      authRepo,
+		Config:        config,
+		EncryptionKey: []byte(encryptionKey),
+		EmailSrv:      emailSrv,
+		Logger:        logger}
 }
 
 func (as *DefaultApiService) PostUser(body models.UserRequest) (int64, error) {
@@ -213,7 +193,7 @@ func (as *DefaultApiService) GetUserLogin(username, password string) (models.Use
 				as.EmailSrv.SendEmail(verificationEmail)
 			}
 		}()
-		if as.HardVerify {
+		if as.Config.GetMailConfig().HardVerify {
 			err := errors.New("email verification required")
 			as.Logger.LogError(err)
 			err = httperrors.NewError(err, http.StatusForbidden)
@@ -408,7 +388,7 @@ func (as *DefaultApiService) hashPassword(password string) ([]byte, error) {
 }
 
 func (as *DefaultApiService) generateAccessJWT(userID int64, userUUID string, roles []string) (string, error) {
-	accessExpiresBy := time.Now().Add(time.Duration(as.AccessTokenExp) * time.Minute).Unix()
+	accessExpiresBy := time.Now().Add(time.Duration(as.Config.GetTokenConfig().AccessExp) * time.Minute).Unix()
 	claims := models.CustomClaims{
 		User: models.TokenUser{
 			UserID:   userID,
@@ -522,10 +502,10 @@ func (as *DefaultApiService) BuildCookie(name, value string, options models.Cook
 
 	switch options.Expiration {
 	case models.Access:
-		expiresBy := time.Now().Add(time.Duration(as.AccessTokenExp) * time.Minute)
+		expiresBy := time.Now().Add(time.Duration(as.Config.GetTokenConfig().AccessExp) * time.Minute)
 		cookie.Expires = expiresBy
 	case models.Refresh:
-		expiresBy := time.Now().Add(time.Duration(as.RefreshTokenExp) * time.Minute)
+		expiresBy := time.Now().Add(time.Duration(as.Config.GetTokenConfig().RefreshExp) * time.Minute)
 		cookie.Expires = expiresBy
 	default:
 		expiresBy := time.Now().Add(time.Duration(15) * time.Minute)

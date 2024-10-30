@@ -1,12 +1,5 @@
 package models
 
-type ApiConfig struct {
-	Domain   string
-	Database Database
-	Token    Token
-	Email    Email
-}
-
 type Database struct {
 	User     string
 	Address  string

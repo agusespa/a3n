@@ -12,19 +12,21 @@ import (
 	"github.com/agusespa/a3n/internal/repository"
 )
 
-type DefaultRealmService struct {
-	AuthRepo repository.AuthRepository
-	Logger   logger.Logger
-}
-
 type RealmService interface {
 	GetRealmById(id int64) (models.RealmEntity, error)
 	PutRealm(req models.RealmRequest) error
 }
 
-func NewDefaultRealmService(authRepo *repository.MySqlRepository, logger logger.Logger) *DefaultRealmService {
+type DefaultRealmService struct {
+	AuthRepo repository.AuthRepository
+	Config   ConfigService
+	Logger   logger.Logger
+}
+
+func NewDefaultRealmService(authRepo *repository.MySqlRepository, config *DefaultConfigService, logger logger.Logger) *DefaultRealmService {
 	return &DefaultRealmService{
 		AuthRepo: authRepo,
+		Config:   config,
 		Logger:   logger}
 }
 
@@ -97,6 +99,8 @@ func (rs *DefaultRealmService) PutRealm(req models.RealmRequest) error {
 		rs.Logger.LogError(err)
 		return err
 	}
+
+	rs.Config.SetRealmConfig(realm)
 
 	return nil
 }

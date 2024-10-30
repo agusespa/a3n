@@ -56,18 +56,15 @@ func main() {
 
 	authRepository := repository.NewMySqlRepository(db)
 
-	realmService := service.NewDefaultRealmService(authRepository, logg)
+	apiConfig := &service.DefaultConfigService{}
+
+	realmService := service.NewDefaultRealmService(authRepository, apiConfig, logg)
 	realmEntity, err := realmService.GetRealmById(1)
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to read realm settings: %s", err.Error()))
 	}
 
-	tokenConfig := models.Token{RefreshExp: realmEntity.RefreshExp, AccessExp: realmEntity.AccessExp}
-
-	emailSender := models.Sender{Name: realmEntity.EmailSender.String, Address: realmEntity.EmailAddr.String}
-	emailConfig := models.Email{Provider: realmEntity.EmailProvider.String, Sender: emailSender, HardVerify: realmEntity.EmailVerify, ApiKey: emailApiKey}
-
-	apiConfig := models.ApiConfig{Domain: realmEntity.RealmDomain, Database: databaseConfig, Token: tokenConfig, Email: emailConfig}
+	*apiConfig = *service.NewDefaultConfigService(realmEntity, databaseConfig, emailApiKey)
 
 	emailService := service.NewDefaultEmailService(apiConfig, logg)
 

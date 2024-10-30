@@ -9,11 +9,8 @@ import (
 
 func TestBuildVerificationEmail(t *testing.T) {
 	es := &DefaultEmailService{
-		Provider:     "sendgrid",
-		ClientDomain: "https://example.com",
-		SenderName:   "Test Sender",
-		SenderAddr:   "sender@example.com",
-		Logger:       mocks.NewMockLogger(false),
+		Config: mocks.NewMockConfigService(),
+		Logger: mocks.NewMockLogger(false),
 	}
 	email := es.BuildVerificationEmail("John", "Doe", "john.doe@example.com", "test-token")
 
