@@ -114,6 +114,20 @@
             }
 
             setInterval(refreshTokenIfActive, t);
+
+            const allowSwap = [400, 401, 403, 404];
+            document.addEventListener("DOMContentLoaded", (event) => {
+                document.body.addEventListener(
+                    "htmx:beforeSwap",
+                    function (evt) {
+                        console.log("jete" + evt.detail.xhr);
+                        if (allowSwap.includes(evt.detail.xhr.status)) {
+                            evt.detail.shouldSwap = true;
+                            evt.detail.isError = false;
+                        }
+                    }
+                );
+            });
         </script>
     </head>
 

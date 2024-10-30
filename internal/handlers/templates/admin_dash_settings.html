@@ -13,6 +13,7 @@
             flex-direction: row;
             align-items: center;
             gap: 0.5rem;
+            height: 2.5rem;
         }
         label {
             width: 200px;
@@ -20,11 +21,14 @@
         input[type="text"],
         input[type="email"] {
             width: 300px;
-            padding: 0.5rem;
+            height: 2rem;
+            padding-left: 0.5rem;
         }
+        select,
         input[type="number"] {
             width: 150px;
-            padding: 0.5rem;
+            height: 2rem;
+            padding-left: 0.5rem;
         }
         button {
             width: 10rem;
@@ -69,18 +73,6 @@
         }
     </style>
 
-    <script>
-        const allowSwap = [401, 403, 404];
-        document.addEventListener("DOMContentLoaded", (event) => {
-            document.body.addEventListener("htmx:beforeSwap", function (evt) {
-                if (allowSwap.includes(evt.detail.xhr.status)) {
-                    evt.detail.shouldSwap = true;
-                    evt.detail.isError = false;
-                }
-            });
-        });
-    </script>
-
     <h1>Realm Settings</h1>
 
     <form
@@ -97,7 +89,7 @@
                 type="text"
                 id="realm_name"
                 name="realm_name"
-                value="{{.RealmName}}"
+                value="{{.Realm.RealmName}}"
                 required
             />
         </div>
@@ -108,7 +100,7 @@
                 type="text"
                 id="realm_domain"
                 name="realm_domain"
-                value="{{.RealmDomain}}"
+                value="{{.Realm.RealmDomain}}"
                 required
             />
         </div>
@@ -119,7 +111,7 @@
                 type="number"
                 id="refresh_exp"
                 name="refresh_exp"
-                value="{{.RefreshExp}}"
+                value="{{.Realm.RefreshExp}}"
                 required
             />
         </div>
@@ -130,8 +122,60 @@
                 type="number"
                 id="access_exp"
                 name="access_exp"
-                value="{{.AccessExp}}"
+                value="{{.Realm.AccessExp}}"
                 required
+            />
+        </div>
+
+        <div class="form-group">
+            <label for="email_provider">Email Provider:</label>
+            <select id="email_provider" name="email_provider">
+                <option
+                    value=""
+                    {{
+                    if
+                    not
+                    .Realm.EmailProvider.Valid
+                    }}selected{{
+                    end
+                    }}
+                ></option>
+                {{ $currentProvider := .Realm.EmailProvider.String }} {{ range
+                $provider := .Providers }}
+                <option
+                    value="{{ $provider }}"
+                    {{
+                    if
+                    eq
+                    $currentProvider
+                    $provider
+                    }}selected{{
+                    end
+                    }}
+                >
+                    {{ $provider }}
+                </option>
+                {{ end }}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="email_sender">Email Sender:</label>
+            <input
+                type="text"
+                id="email_sender"
+                name="email_sender"
+                value="{{if .Realm.EmailSender.Valid}}{{.Realm.EmailSender.String}}{{end}}"
+            />
+        </div>
+
+        <div class="form-group">
+            <label for="email_addr">Email Address:</label>
+            <input
+                type="email"
+                id="email_addr"
+                name="email_addr"
+                value="{{if .Realm.EmailAddr.Valid}}{{.Realm.EmailAddr.String}}{{end}}"
             />
         </div>
 
@@ -142,37 +186,7 @@
                 id="email_verify"
                 name="email_verify"
                 {{if
-                .EmailVerify}}checked{{end}}
-            />
-        </div>
-
-        <div class="form-group">
-            <label for="email_provider">Email Provider:</label>
-            <input
-                type="text"
-                id="email_provider"
-                name="email_provider"
-                value="{{if .EmailProvider.Valid}}{{.EmailProvider.String}}{{end}}"
-            />
-        </div>
-
-        <div class="form-group">
-            <label for="email_sender">Email Sender:</label>
-            <input
-                type="text"
-                id="email_sender"
-                name="email_sender"
-                value="{{if .EmailSender.Valid}}{{.EmailSender.String}}{{end}}"
-            />
-        </div>
-
-        <div class="form-group">
-            <label for="email_addr">Email Address:</label>
-            <input
-                type="email"
-                id="email_addr"
-                name="email_addr"
-                value="{{if .EmailAddr.Valid}}{{.EmailAddr.String}}{{end}}"
+                .Realm.EmailVerify}}checked{{end}}
             />
         </div>
 

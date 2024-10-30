@@ -72,7 +72,7 @@ func main() {
 
 	apiHandler := handlers.NewDefaultApiHandler(apiService, realmService, logg)
 
-	adminHandler := handlers.NewDefaultAdminHandler(apiService, logg)
+	adminHandler := handlers.NewDefaultAdminHandler(apiService, realmService, apiConfig, logg)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/realm", apiHandler.HandleRealm)

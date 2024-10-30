@@ -25,7 +25,6 @@ import (
 )
 
 type ApiService interface {
-	GetRealmData(id int64) (models.RealmEntity, error)
 	PostUser(body models.UserRequest) (int64, error)
 	BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error)
 	PutUserEmailVerification(email string) error
@@ -285,15 +284,6 @@ func (as *DefaultApiService) GetUserData(id int64) (models.UserData, error) {
 
 	userData = models.NewUserData(userEntity.UserID, userEntity.EmailVerified, userEntity.UserUUID, userEntity.Email, userEntity.FirstName, userEntity.LastName, userEntity.MiddleName, userEntity.CreatedAt, roles)
 	return userData, err
-}
-
-func (as *DefaultApiService) GetRealmData(id int64) (models.RealmEntity, error) {
-	realm, err := as.AuthRepo.ReadRealmById(id)
-	if err != nil {
-		as.Logger.LogError(err)
-		return realm, err
-	}
-	return realm, err
 }
 
 func (as *DefaultApiService) GetFreshAccessToken(refreshToken string) (string, int64, error) {

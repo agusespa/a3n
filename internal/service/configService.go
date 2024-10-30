@@ -7,19 +7,22 @@ type ConfigService interface {
 	GetTokenConfig() *models.Token
 	GetDatabaseConfig() *models.Database
 	GetDomain() string
+	GetSupportedEmailProviders() []string
 	SetRealmConfig(realm models.RealmEntity)
 }
 
 type DefaultConfigService struct {
-	Domain   string
-	Database models.Database
-	Token    models.Token
-	Email    models.Email
+	Domain                  string
+	Database                models.Database
+	Token                   models.Token
+	Email                   models.Email
+	SupportedEmailProviders []string
 }
 
 func NewDefaultConfigService(realm models.RealmEntity, database models.Database, emailApiKey string) *DefaultConfigService {
 	emailSender := models.Sender{Name: realm.EmailSender.String, Address: realm.EmailAddr.String}
 	emailConfig := models.Email{Provider: realm.EmailProvider.String, Sender: emailSender, HardVerify: realm.EmailVerify, ApiKey: emailApiKey}
+	emailProviderList := []string{"sendgrid"}
 
 	var refreshExp int64
 	if realm.RefreshExp == 0 {
@@ -36,10 +39,11 @@ func NewDefaultConfigService(realm models.RealmEntity, database models.Database,
 	tokenConfig := models.Token{RefreshExp: refreshExp, AccessExp: accessExp}
 
 	return &DefaultConfigService{
-		Domain:   realm.RealmDomain,
-		Database: database,
-		Token:    tokenConfig,
-		Email:    emailConfig,
+		Domain:                  realm.RealmDomain,
+		Database:                database,
+		Token:                   tokenConfig,
+		Email:                   emailConfig,
+		SupportedEmailProviders: emailProviderList,
 	}
 }
 
@@ -57,6 +61,10 @@ func (cs *DefaultConfigService) GetDatabaseConfig() *models.Database {
 
 func (cs *DefaultConfigService) GetDomain() string {
 	return cs.Domain
+}
+
+func (cs *DefaultConfigService) GetSupportedEmailProviders() []string {
+	return cs.SupportedEmailProviders
 }
 
 func (cs *DefaultConfigService) SetRealmConfig(realm models.RealmEntity) {

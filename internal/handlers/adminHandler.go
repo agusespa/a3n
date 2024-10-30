@@ -23,12 +23,14 @@ type AdminHandler interface {
 }
 
 type DefaultAdminHandler struct {
-	ApiService service.ApiService
-	Logger     logger.Logger
+	ApiService   service.ApiService
+	RealmService service.RealmService
+	Config       service.ConfigService
+	Logger       logger.Logger
 }
 
-func NewDefaultAdminHandler(authService service.ApiService, logger logger.Logger) *DefaultAdminHandler {
-	return &DefaultAdminHandler{ApiService: authService, Logger: logger}
+func NewDefaultAdminHandler(authService service.ApiService, realmService service.RealmService, config service.ConfigService, logger logger.Logger) *DefaultAdminHandler {
+	return &DefaultAdminHandler{ApiService: authService, RealmService: realmService, Config: config, Logger: logger}
 }
 
 //go:embed templates/*.html
@@ -133,7 +135,7 @@ func (h *DefaultAdminHandler) HandleAdminSettings(w http.ResponseWriter, r *http
 		return
 	}
 
-	data, err := h.ApiService.GetRealmData(1)
+	realm, err := h.RealmService.GetRealmById(1)
 	if err != nil {
 		h.Logger.LogError(err)
 		message := `<div class="error">Failed request</div>`
@@ -149,6 +151,15 @@ func (h *DefaultAdminHandler) HandleAdminSettings(w http.ResponseWriter, r *http
 		message := `<div class="error">Something went wrong</div>`
 		payload.WriteHTMLError(w, r, err, message)
 		return
+	}
+
+	type TemplateData struct {
+		Realm     models.RealmEntity
+		Providers []string
+	}
+	data := TemplateData{
+		Realm:     realm,
+		Providers: h.Config.GetSupportedEmailProviders(),
 	}
 
 	err = tmpl.Execute(w, data)

@@ -106,7 +106,7 @@ func (h *DefaultApiHandler) HandleRealm(w http.ResponseWriter, r *http.Request) 
 
 	err = h.RealmService.PutRealm(realmReq)
 	if err != nil {
-		message := `<div class="error">There was an error updating the realm</div>`
+		message := fmt.Sprintf(`<div class="error">There was an error updating the realm: %v</div>`, err.Error())
 		payload.WriteHTMLError(w, r, err, message)
 		return
 	}

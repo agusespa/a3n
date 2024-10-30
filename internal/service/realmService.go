@@ -10,6 +10,7 @@ import (
 	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/repository"
+	"golang.org/x/exp/slices"
 )
 
 type RealmService interface {
@@ -81,6 +82,20 @@ func (rs *DefaultRealmService) PutRealm(req models.RealmRequest) error {
 	emailProvider := helpers.ParseNullString(req.EmailProvider)
 	emailSender := helpers.ParseNullString(req.EmailSender)
 	emailVerify := req.EmailVerify == "on"
+
+	if emailVerify && (!emailProvider.Valid || !emailAddr.Valid || !emailSender.Valid) {
+		err := errors.New("can't enable hard verify without complete email provider config")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		rs.Logger.LogError(err)
+		return err
+	}
+
+	if emailProvider.Valid && !slices.Contains(rs.Config.GetSupportedEmailProviders(), emailProvider.String) {
+		err := errors.New("email provider is not supported")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		rs.Logger.LogError(err)
+		return err
+	}
 
 	realm := models.RealmEntity{
 		RealmID:       1,

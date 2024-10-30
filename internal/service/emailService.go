@@ -41,6 +41,11 @@ func NewDefaultEmailService(config *DefaultConfigService, logger logger.Logger) 
 }
 
 func (es *DefaultEmailService) SendEmail(email *mail.SGMailV3) {
+	if es.Config.GetMailConfig().Provider == "" {
+		es.Logger.LogError(fmt.Errorf("no email provider has been set, update the configuration to enable email support"))
+		return
+	}
+
 	response, err := es.Client.Send(email)
 	if err != nil {
 		es.Logger.LogError(fmt.Errorf("failed to send email: %v", err.Error()))
