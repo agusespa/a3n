@@ -15,7 +15,7 @@ The following secrets must be provided as environment variables:
 - "A3N_DB_PASSWORD" for the mysql database password
 
 ### Settings
-You can modify the default settings on the admin client:
+You can modify the default settings on the admin dashboard at `/admin/dashboard/settings`:
 - client domain for the email links and jwt subject:
 ```json
 "client": {
