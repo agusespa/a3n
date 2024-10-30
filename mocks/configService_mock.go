@@ -43,5 +43,9 @@ func (cs *MockConfigService) GetDomain() string {
 	return cs.Domain
 }
 
+func (cs *MockConfigService) GetSupportedEmailProviders() []string {
+	return []string{"test"}
+}
+
 func (cs *MockConfigService) SetRealmConfig(realm models.RealmEntity) {
 }
