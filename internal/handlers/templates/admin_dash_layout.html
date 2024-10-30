@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Admin Dashboard</title>
+        <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+        <style>
+            body,
+            html {
+                margin: 0;
+                padding: 0;
+                font-family: Arial, sans-serif;
+                height: 100%;
+                background-color: #000;
+                color: #fff;
+            }
+
+            .container {
+                display: flex;
+                height: 100%;
+            }
+
+            .sidebar {
+                width: 200px;
+                background-color: #111;
+                border-right: 1px solid #fff;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .sidebar h1 {
+                padding: 20px;
+                margin: 0;
+                border-bottom: 1px solid #fff;
+            }
+
+            .sidebar nav {
+                flex-grow: 1;
+            }
+
+            .sidebar nav a {
+                display: block;
+                padding: 10px 20px;
+                text-decoration: none;
+                color: #fff;
+                border-bottom: 1px solid #333;
+                cursor: pointer;
+            }
+
+            .sidebar nav a:hover {
+                background-color: #222;
+            }
+
+            .user-section {
+                padding: 20px;
+                border-top: 1px solid #fff;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 20px;
+            }
+
+            .card {
+                border: 1px solid #fff;
+                padding: 20px;
+            }
+
+            button {
+                background-color: #000;
+                color: #fff;
+                border: 1px solid #fff;
+                padding: 5px 10px;
+                cursor: pointer;
+                margin-right: 10px;
+            }
+
+            button:hover {
+                background-color: #222;
+            }
+        </style>
+
+        <script>
+            const t = 600000;
+            let lastActivityTime = Date.now();
+
+            function resetActivityTimer() {
+                lastActivityTime = Date.now();
+            }
+
+            document.addEventListener("keydown", resetActivityTimer);
+            document.addEventListener("click", resetActivityTimer);
+
+            function refreshTokenIfActive() {
+                const now = Date.now();
+
+                if (now - lastActivityTime <= t) {
+                    htmx.ajax("GET", "/api/refresh", {
+                        swap: "none",
+                        headers: {
+                            "X-Admin-Request": "true",
+                        },
+                        error: function (response) {
+                            window.location.href = "/a3n/admin/login";
+                        },
+                    });
+                }
+            }
+
+            setInterval(refreshTokenIfActive, t);
+
+            const allowSwap = [400, 401, 403, 404];
+            document.addEventListener("DOMContentLoaded", (event) => {
+                document.body.addEventListener(
+                    "htmx:beforeSwap",
+                    function (evt) {
+                        console.log("jete" + evt.detail.xhr);
+                        if (allowSwap.includes(evt.detail.xhr.status)) {
+                            evt.detail.shouldSwap = true;
+                            evt.detail.isError = false;
+                        }
+                    }
+                );
+            });
+        </script>
+    </head>
+
+    <body>
+        <div class="container">
+            <nav class="sidebar">
+                <h1>a3n</h1>
+                <nav>
+                    <a
+                        hx-get="/admin/dashboard/actions"
+                        hx-target="#main"
+                        hx-swap="innerHTML"
+                        >Dashboard</a
+                    >
+                    <a
+                        hx-get="/admin/dashboard/settings"
+                        hx-target="#main"
+                        hx-swap="innerHTML"
+                        >Settings</a
+                    >
+                    <a
+                        hx-get="/admin/dashboard/users"
+                        hx-target="#main"
+                        hx-swap="innerHTML"
+                        >Users</a
+                    >
+                    <a
+                        hx-get="/admin/dashboard/roles"
+                        hx-target="#main"
+                        hx-swap="innerHTML"
+                        >Roles</a
+                    >
+                </nav>
+                <div class="user-section">
+                    <strong>{{ .FirstName }}</strong>
+                    <a href="/admin/login" href="logout">Logout</a>
+                </div>
+            </nav>
+
+            <main
+                id="main"
+                class="main-content"
+                hx-get="/admin/dashboard/actions"
+                hx-trigger="load"
+                hx-swap="innerHTML"
+            ></main>
+        </div>
+    </body>
+</html>

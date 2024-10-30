@@ -21,15 +21,29 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		statusCode = http.StatusInternalServerError
 	}
 
-	if isHTML(errorMessage) {
-		contentType = "text/html"
-	} else {
-		contentType = "text/plain"
-	}
+	// TODO handle more error message types
+	contentType = "text/plain"
 
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(statusCode)
 	if _, err := w.Write([]byte(errorMessage)); err != nil {
+		// TODO handle properly
+		return
+	}
+}
+
+func WriteHTMLError(w http.ResponseWriter, r *http.Request, err error, message string) {
+	var statusCode int
+
+	if customErr, ok := err.(*httperrors.Error); ok {
+		statusCode = customErr.Status()
+	} else {
+		statusCode = http.StatusInternalServerError
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(statusCode)
+	if _, err := w.Write([]byte(message)); err != nil {
 		// TODO handle properly
 		return
 	}

@@ -1,9 +1,6 @@
 package main
 
 import (
-	"embed"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -11,6 +8,7 @@ import (
 
 	"github.com/agusespa/a3n/internal/database"
 	"github.com/agusespa/a3n/internal/handlers"
+	"github.com/agusespa/a3n/internal/helpers"
 	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/repository"
@@ -35,67 +33,64 @@ func corsMiddleware(next http.Handler, domain string) http.Handler {
 	})
 }
 
-//go:embed config/config.json
-var configFile embed.FS
-
 func main() {
 	var devFlag bool
 	flag.BoolVar(&devFlag, "dev", false, "enable development mode")
 	flag.Parse()
 	logg = logger.NewLogger(devFlag)
 
-	encryptionKey := os.Getenv("A3N_ENCRYPTION_KEY")
-	if encryptionKey == "" {
-		logg.LogFatal(errors.New("failed to get ENCRYPTION_KEY variable"))
-	}
-	dbPassword := os.Getenv("A3N_DB_PASSWORD")
-	if dbPassword == "" {
-		logg.LogFatal(errors.New("failed to get DB_PASSWORD variable"))
-	}
-	emailApiKey := os.Getenv("A3N_EMAIL_API_KEY")
-	if emailApiKey == "" {
-		logg.LogFatal(errors.New("failed to get EMAIL_API_KEY variable"))
+	encryptionKey, emailApiKey, err := helpers.GetApiKeyVars()
+	if err != nil {
+		logg.LogFatal(fmt.Errorf("failed to read env variables: %s", err.Error()))
 	}
 
-	var config models.Config
-	configData, err := configFile.ReadFile("config/config.json")
+	dbUser, dbAddr, dbPassword, err := helpers.GetDatabaseVars()
 	if err != nil {
-		logg.LogFatal(err)
+		logg.LogFatal(fmt.Errorf("failed to read env variables: %s", err.Error()))
 	}
-	err = json.Unmarshal(configData, &config)
-	if err != nil {
-		logg.LogFatal(err)
-	}
-
-	db, err := database.ConnectDB(config.Api.Database, dbPassword)
+	databaseConfig := models.Database{User: dbUser, Address: dbAddr, Password: dbPassword}
+	db, err := database.ConnectDB(databaseConfig)
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to establish database connection: %s", err.Error()))
 	}
 
 	authRepository := repository.NewMySqlRepository(db)
 
-	emailService := service.NewDefaultEmailService(config, emailApiKey, logg)
+	apiConfig := &service.DefaultConfigService{}
 
-	apiService := service.NewDefaultApiService(authRepository, config.Api, emailService, encryptionKey, logg)
+	realmService := service.NewDefaultRealmService(authRepository, apiConfig, logg)
+	realmEntity, err := realmService.GetRealmById(1)
+	if err != nil {
+		logg.LogFatal(fmt.Errorf("failed to read realm settings: %s", err.Error()))
+	}
 
-	apiHandler := handlers.NewDefaultApiHandler(apiService, logg)
+	*apiConfig = *service.NewDefaultConfigService(realmEntity, databaseConfig, emailApiKey)
 
-	adminHandler := handlers.NewDefaultAdminHandler(apiService, logg)
+	emailService := service.NewDefaultEmailService(apiConfig, logg)
+
+	apiService := service.NewDefaultApiService(authRepository, apiConfig, emailService, encryptionKey, logg)
+
+	apiHandler := handlers.NewDefaultApiHandler(apiService, realmService, logg)
+
+	adminHandler := handlers.NewDefaultAdminHandler(apiService, realmService, apiConfig, logg)
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/realm", apiHandler.HandleRealm)
 	mux.HandleFunc("/api/register", apiHandler.HandleUserRegister)
-	mux.HandleFunc("/api/login", apiHandler.HandleUserLogin)
+	mux.HandleFunc("/api/login", apiHandler.HandleLogin)
 	mux.HandleFunc("/api/user/email/verify", apiHandler.HandleUserEmailVerification)
 	mux.HandleFunc("/api/user/email", apiHandler.HandleUserEmailChange)
 	mux.HandleFunc("/api/user/password", apiHandler.HandleUserPasswordChange)
 	mux.HandleFunc("/api/user", apiHandler.HandleUserData)
 	mux.HandleFunc("/api/authenticate", apiHandler.HandleUserAuthentication)
-	mux.HandleFunc("/api/refresh", apiHandler.HandleTokenRefresh)
+	mux.HandleFunc("/api/refresh", apiHandler.HandleRefresh)
 	mux.HandleFunc("/api/logout/all", apiHandler.HandleAllUserTokensRevocation)
 	mux.HandleFunc("/api/logout", apiHandler.HandleTokenRevocation)
 
-	mux.HandleFunc("/admin/dashboard", adminHandler.HandleAdminDashboard)
 	mux.HandleFunc("/admin/login", adminHandler.HandleAdminLogin)
+	mux.HandleFunc("/admin/dashboard/settings", adminHandler.HandleAdminSettings)
+	mux.HandleFunc("/admin/dashboard/actions", adminHandler.HandleAdminActions)
+	mux.HandleFunc("/admin/dashboard", adminHandler.HandleAdminDashboard)
 
 	port := os.Getenv("A3N_PORT")
 	if port == "" {
@@ -104,7 +99,7 @@ func main() {
 
 	logg.LogInfo(fmt.Sprintf("Listening on port %v", port))
 
-	err = http.ListenAndServe(":"+port, corsMiddleware(mux, config.Api.Client.Domain))
+	err = http.ListenAndServe(":"+port, corsMiddleware(mux, realmEntity.RealmDomain))
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to start HTTP server: %s", err.Error()))
 	}

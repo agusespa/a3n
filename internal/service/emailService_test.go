@@ -1,33 +1,17 @@
 package service
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/agusespa/a3n/mocks"
 )
 
-var es *DefaultEmailService
-
-func TestMain(m *testing.M) {
-	es = &DefaultEmailService{
-		Provider:        "sendgrid",
-		ClientDomain:    "https://example.com",
-		SenderName:      "Test Sender",
-		SenderAddr:      "sender@example.com",
-		BackgroundColor: "#F0F0F0",
-		FontColor:       "#333333",
-		LinkColor:       "#0000FF",
-		Logger:          mocks.NewMockLogger(false),
-	}
-
-	code := m.Run()
-
-	os.Exit(code)
-}
-
 func TestBuildVerificationEmail(t *testing.T) {
+	es := &DefaultEmailService{
+		Config: mocks.NewMockConfigService(),
+		Logger: mocks.NewMockLogger(false),
+	}
 	email := es.BuildVerificationEmail("John", "Doe", "john.doe@example.com", "test-token")
 
 	if email.From.Name != "Test Sender" {

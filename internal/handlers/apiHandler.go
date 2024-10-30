@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,11 +17,16 @@ import (
 )
 
 type ApiHandler interface {
+	HandleRealm(w http.ResponseWriter, r *http.Request)
 	HandleUserRegister(w http.ResponseWriter, r *http.Request)
 	HandleUserEmailChange(w http.ResponseWriter, r *http.Request)
 	HandleUserPasswordChange(w http.ResponseWriter, r *http.Request)
-	HandleUserLogin(w http.ResponseWriter, r *http.Request)
-	HandleTokenRefresh(w http.ResponseWriter, r *http.Request)
+	HandleLogin(w http.ResponseWriter, r *http.Request)
+	handleUserLogin(w http.ResponseWriter, r *http.Request)
+	handleAdminLogin(w http.ResponseWriter, r *http.Request)
+	HandleRefresh(w http.ResponseWriter, r *http.Request)
+	handleAdminTokenRefresh(w http.ResponseWriter, r *http.Request)
+	handleUserTokenRefresh(w http.ResponseWriter, r *http.Request)
 	HandleUserEmailVerification(w http.ResponseWriter, r *http.Request)
 	HandleUserAuthentication(w http.ResponseWriter, r *http.Request)
 	HandleTokenRevocation(w http.ResponseWriter, r *http.Request)
@@ -30,12 +34,85 @@ type ApiHandler interface {
 }
 
 type DefaultApiHandler struct {
-	ApiService service.ApiService
-	Logger     logger.Logger
+	ApiService   service.ApiService
+	RealmService service.RealmService
+	Logger       logger.Logger
 }
 
-func NewDefaultApiHandler(authService service.ApiService, logger logger.Logger) *DefaultApiHandler {
-	return &DefaultApiHandler{ApiService: authService, Logger: logger}
+func NewDefaultApiHandler(apiService service.ApiService, realmService service.RealmService, logger logger.Logger) *DefaultApiHandler {
+	return &DefaultApiHandler{ApiService: apiService, RealmService: realmService, Logger: logger}
+}
+
+func (h *DefaultApiHandler) HandleRealm(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
+	if r.Method != http.MethodPut {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	err := r.ParseForm()
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	realmReq := models.RealmRequest{}
+
+	realmReq.RealmName = r.Form.Get("realm_name")
+	if realmReq.RealmName == "" {
+		err := errors.New("realm name not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	realmReq.RealmDomain = r.Form.Get("realm_domain")
+	if realmReq.RealmDomain == "" {
+		err := errors.New("realm domain not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	realmReq.RefreshExp = r.Form.Get("refresh_exp")
+	if realmReq.RefreshExp == "" {
+		err := errors.New("refresh token expiration not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	realmReq.AccessExp = r.Form.Get("access_exp")
+	if realmReq.AccessExp == "" {
+		err := errors.New("access token expiration not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	realmReq.EmailVerify = r.Form.Get("email_verify")
+	realmReq.EmailSender = r.Form.Get("email_sender")
+	realmReq.EmailProvider = r.Form.Get("email_provider")
+	realmReq.EmailAddr = r.Form.Get("email_addr")
+
+	err = h.RealmService.PutRealm(realmReq)
+	if err != nil {
+		message := fmt.Sprintf(`<div class="error">There was an error updating the realm: %v</div>`, err.Error())
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	message := `<div class="success">Update successful</div>`
+	payload.Write(w, r, message, nil)
 }
 
 func (h *DefaultApiHandler) HandleUserRegister(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +128,22 @@ func (h *DefaultApiHandler) HandleUserRegister(w http.ResponseWriter, r *http.Re
 	var userReq models.UserRequest
 	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
 		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if userReq.FirstName == "" || userReq.LastName == "" {
+		err := errors.New("name not provided")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if userReq.Email == "" || userReq.Password == "" {
+		err := errors.New("missing credentials")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
@@ -89,16 +182,16 @@ func (h *DefaultApiHandler) HandleUserEmailChange(w http.ResponseWriter, r *http
 
 	if req.Email == "" || req.Password == "" {
 		err := errors.New("missing credentials")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
 
 	if req.NewEmail == "" {
 		err := errors.New("missing new email address")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -136,16 +229,16 @@ func (h *DefaultApiHandler) HandleUserPasswordChange(w http.ResponseWriter, r *h
 
 	if req.Email == "" || req.Password == "" {
 		err := errors.New("missing credentials")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
 
 	if req.NewPassword == "" {
 		err := errors.New("missing new password")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -163,10 +256,8 @@ func (h *DefaultApiHandler) HandleUserPasswordChange(w http.ResponseWriter, r *h
 	payload.Write(w, r, res, nil)
 }
 
-func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
-
-	isAdminClient := r.Header.Get("X-Admin-Request") == "true"
 
 	if r.Method != http.MethodPost {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
@@ -175,6 +266,16 @@ func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	isAdminClient := r.Header.Get("X-Admin-Request") == "true"
+
+	if isAdminClient {
+		h.handleAdminLogin(w, r)
+	} else {
+		h.handleUserLogin(w, r)
+	}
+}
+
+func (h *DefaultApiHandler) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	var authReq models.AuthRequest
 	err := r.ParseForm()
 	if err != nil {
@@ -188,23 +289,59 @@ func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Reque
 
 	if authReq.Email == "" || authReq.Password == "" {
 		err := errors.New("missing credentials")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
+		h.Logger.LogError(err)
+		message := `<div class="error">Missing credentials</div>`
+		payload.WriteHTMLError(w, r, err, message)
 		return
 	}
 
-	if isAdminClient {
-		adminAuthData, err := h.ApiService.GetUserAdminLogin(authReq.Email, authReq.Password, helpers.GetIP(r))
-		if err != nil {
-			payload.WriteError(w, r, err)
-			return
+	adminAuthData, err := h.ApiService.GetAdminUserLogin(authReq.Email, authReq.Password, helpers.GetIP(r))
+	if err != nil {
+		var statusCode int
+		var message string
+		if customErr, ok := err.(*httperrors.Error); ok {
+			statusCode = customErr.Status()
+		} else {
+			statusCode = http.StatusInternalServerError
 		}
-		w.Header().Set("HX-Redirect", "/a3n/admin/dashboard")
-		res := `<div id="response"><div id="redirecting">Login successful. Redirecting...</div></div>`
-		access_cookie := h.ApiService.BuildCookie("access_token", adminAuthData.AccessToken, models.CookieOptions{Path: "/a3n/admin"})
-		cookies := []*http.Cookie{access_cookie}
-		payload.Write(w, r, res, cookies)
+		if statusCode == http.StatusForbidden {
+			message = `<div class="error">Username not registered</div>`
+		} else if statusCode == http.StatusNotFound {
+			message = `<div class="error">Username not registered</div>`
+		} else if statusCode == http.StatusUnauthorized {
+			message = `<div class="error">Incorrect password</div>`
+		} else {
+			message = `<div class="error">Unknown error</div>`
+		}
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/admin/dashboard")
+	res := `<div class="success">Login successful. Redirecting...</div>`
+	access_cookie := h.ApiService.BuildCookie("refresh_token", adminAuthData.AccessToken, models.CookieOptions{Path: "/"})
+	cookies := []*http.Cookie{access_cookie}
+	payload.Write(w, r, res, cookies)
+}
+
+func (h *DefaultApiHandler) handleUserLogin(w http.ResponseWriter, r *http.Request) {
+	var authReq models.AuthRequest
+	err := r.ParseForm()
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+	authReq.Email = r.Form.Get("username")
+	authReq.Password = r.Form.Get("password")
+
+	if authReq.Email == "" || authReq.Password == "" {
+		err := errors.New("missing credentials")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
 		return
 	}
 
@@ -236,7 +373,7 @@ func (h *DefaultApiHandler) HandleUserLogin(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (h *DefaultApiHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultApiHandler) HandleRefresh(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method != http.MethodGet {
@@ -247,22 +384,61 @@ func (h *DefaultApiHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Re
 	}
 
 	bearerToken := ""
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
-	}
-
-	if bearerToken == "" {
+	} else {
 		cookie, err := r.Cookie("refresh_token")
 		if err == nil {
-			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-			if err == nil {
-				bearerToken = string(decodedValue)
-			}
+			bearerToken = cookie.Value
 		}
 	}
 
+	isAdminClient := r.Header.Get("X-Admin-Request") == "true"
+
+	if isAdminClient {
+		h.handleAdminTokenRefresh(w, r, bearerToken)
+	} else {
+		h.handleUserTokenRefresh(w, r, bearerToken)
+	}
+}
+
+func (h *DefaultApiHandler) handleAdminTokenRefresh(w http.ResponseWriter, r *http.Request, bearerToken string) {
+	if bearerToken == "" {
+		err := errors.New("missing refresh token")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		message := `<div class="error">Missing refresh token</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	claims, err := h.ApiService.AuthenticateAdminUser(bearerToken, r)
+	if err != nil {
+		message := `<div class="error">Failed authentication</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	token, err := h.ApiService.GenerateAdminSessionJWT(claims.User.UserID, claims.User.UserUUID, claims.Roles, helpers.GetIP(r))
+	if err != nil {
+		err := errors.New("failed generating jwt token")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		message := `<div class="error">Internal server error</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	res := models.RefreshRequestResponse{
+		UserID: claims.User.UserID,
+	}
+	access_cookie := h.ApiService.BuildCookie("refresh_token", token, models.CookieOptions{Path: "/", Expiration: models.Access})
+	cookies := []*http.Cookie{access_cookie}
+	payload.Write(w, r, res, cookies)
+}
+
+func (h *DefaultApiHandler) handleUserTokenRefresh(w http.ResponseWriter, r *http.Request, bearerToken string) {
 	if bearerToken == "" {
 		err := errors.New("missing refresh token")
 		h.Logger.LogError(err)
@@ -273,6 +449,7 @@ func (h *DefaultApiHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Re
 
 	accessToken, userID, err := h.ApiService.GetFreshAccessToken(bearerToken)
 	if err != nil {
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -282,7 +459,7 @@ func (h *DefaultApiHandler) HandleTokenRefresh(w http.ResponseWriter, r *http.Re
 		res := models.RefreshRequestResponse{
 			UserID: userID,
 		}
-		access_cookie := h.ApiService.BuildCookie("access_token", accessToken, models.CookieOptions{Path: "/authapi", Expiration: models.Access})
+		access_cookie := h.ApiService.BuildCookie("access_token", accessToken, models.CookieOptions{Path: "/api", Expiration: models.Access})
 		cookies := []*http.Cookie{access_cookie}
 		payload.Write(w, r, res, cookies)
 	} else {
@@ -305,19 +482,13 @@ func (h *DefaultApiHandler) HandleUserData(w http.ResponseWriter, r *http.Reques
 	}
 
 	bearerToken := ""
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
-	}
-
-	if bearerToken == "" {
-		cookie, err := r.Cookie("access_token")
+	} else {
+		cookie, err := r.Cookie("refresh_token")
 		if err == nil {
-			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-			if err == nil {
-				bearerToken = string(decodedValue)
-			}
+			bearerToken = cookie.Value
 		}
 	}
 
@@ -351,9 +522,8 @@ func (h *DefaultApiHandler) HandleUserData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// TODO handle case of admin in claims
-	if claims.User.UserID != userID {
-		err := errors.New("user id missmatch")
+	if claims.User.UserID != userID || claims.Type != "admin" {
+		err := errors.New("user doesn't have permissions to access this data")
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
@@ -380,19 +550,13 @@ func (h *DefaultApiHandler) HandleUserEmailVerification(w http.ResponseWriter, r
 	}
 
 	bearerToken := ""
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
-	}
-
-	if bearerToken == "" {
-		cookie, err := r.Cookie("access_token")
+	} else {
+		cookie, err := r.Cookie("refresh_token")
 		if err == nil {
-			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-			if err == nil {
-				bearerToken = string(decodedValue)
-			}
+			bearerToken = cookie.Value
 		}
 	}
 
@@ -437,19 +601,13 @@ func (h *DefaultApiHandler) HandleUserAuthentication(w http.ResponseWriter, r *h
 	}
 
 	bearerToken := ""
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
-	}
-
-	if bearerToken == "" {
-		cookie, err := r.Cookie("access_token")
+	} else {
+		cookie, err := r.Cookie("refresh_token")
 		if err == nil {
-			decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-			if err == nil {
-				bearerToken = string(decodedValue)
-			}
+			bearerToken = cookie.Value
 		}
 	}
 

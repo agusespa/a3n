@@ -1,4 +1,5 @@
 A3N is a light-weight identity and access management service for jwt based authentication.
+It supports browser and mobile based clients.
 
 # Set up
 ## Dependencies
@@ -8,76 +9,41 @@ Install mysql and set it up.
 ### Secrets
 The following secrets must be provided as environment variables:
 - "A3N_ENCRYPTION_KEY" for the key used to sign the jwts
-- "A3N_DB_PASSWORD" for the database password
 - "A3N_EMAIL_API_KEY" for the email service api key (atm only Sendgrid is supported)
+- "A3N_DB_USER" for the mysql database user
+- "A3N_DB_ADDR" for the mysql database address
+- "A3N_DB_PASSWORD" for the mysql database password
 
-### Config
-The `config/config.json` file contains two objects:
-- `api` to provide variables
-- `branding` to provide customizations
-```json
-{
-    "api": {
-    },
-    "branding": {
-    }
-}
-```
-#### Api Vars
-Provide the following data inside the `api` object:
-- MySql connection:
-```json
-"database": {
-    "user": "root",
-    "address": "192.108.1.1",
-    "name": "auth"
-},
-```
+### Settings
+You can modify the default settings on the admin client:
 - client domain for the email links and jwt subject:
 ```json
 "client": {
-    "domain": "http://myapp.com"
+    "domain": "localhost:9001"
 },
 ```
 - jwt access token settings:
 ```json
 "token": {
-    "refreshExp": 10,
+    "refreshExp": 1440,
     "accessExp": 5
 },
 ```
 - email service vars (only Sendgrid is currently supported):
 ```json
 "email": {
-    "provider": "sendgrid",
+    "provider": null,
     "sender": {
-        "address": "no-reply@myapp.com",
-        "name": "myapp"
+        "address": null,
+        "name": null
     },
     "hardVerify": false
 }
 ```
 
-#### Branding
-Use the `branding` object to provide custom colors for the emails and the web client:
-```json
-"colorScheme": {
-    "primary": "#FADE84",
-    "secondary": "#6F826F",
-    "background": "#6F826F",
-    "font": "#FFFFFF",
-    "link": "#FADE84"
-}
-```
-To use a custom logo, provide the url to the file. It must be a png file named 'logo.png', with dimentions 500px by 500px.
-```json
-"logoUrl": "https://github.com/agusespa/a3n/blob/main/config/assets/logo.png?raw=true"
-```
-
 ## Install
 `make install` will guide you through the setup process for provisioning the database.
-Make sure you provide the variables in the config file and environment variables. See [Api Vars](#Api Vars).
-Alternatively, you can use the schema file to set up the database and admin user manually.
+Alternatively, you can use the schema file to set up the database and create the realm and admin user manually.
 
 ## Build and run
 `make build` generates binaries with linux amd64 as the default plataform.

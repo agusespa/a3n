@@ -2,11 +2,12 @@ package service
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"html/template"
+	"path/filepath"
 
 	"github.com/agusespa/a3n/internal/logger"
-	"github.com/agusespa/a3n/internal/models"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
@@ -17,18 +18,10 @@ type EmailService interface {
 }
 
 type DefaultEmailService struct {
-	Provider        string
-	Client          *sendgrid.Client
-	ClientDomain    string
-	SenderName      string
-	SenderAddr      string
-	Logo            string
-	PrimaryColor    string
-	SecondaryColor  string
-	FontColor       string
-	LinkColor       string
-	BackgroundColor string
-	Logger          logger.Logger
+	Client *sendgrid.Client
+	Config ConfigService
+	Logo   string
+	Logger logger.Logger
 }
 
 type EmailContent struct {
@@ -39,23 +32,20 @@ type EmailContent struct {
 	LinkColor       string
 }
 
-func NewDefaultEmailService(config models.Config, key string, logger logger.Logger) *DefaultEmailService {
+func NewDefaultEmailService(config *DefaultConfigService, logger logger.Logger) *DefaultEmailService {
 	return &DefaultEmailService{
-		Provider:        config.Api.Email.Provider,
-		Client:          sendgrid.NewSendClient(key),
-		ClientDomain:    config.Api.Client.Domain,
-		SenderName:      config.Api.Email.Sender.Name,
-		SenderAddr:      config.Api.Email.Sender.Address,
-		Logo:            config.Branding.Logo,
-		PrimaryColor:    config.Branding.Colors.Primary,
-		SecondaryColor:  config.Branding.Colors.Secondary,
-		FontColor:       config.Branding.Colors.Font,
-		LinkColor:       config.Branding.Colors.Link,
-		BackgroundColor: config.Branding.Colors.Background,
-		Logger:          logger}
+		Client: sendgrid.NewSendClient(config.GetMailConfig().ApiKey),
+		Config: config,
+		Logo:   "https://github.com/agusespa/a3n/blob/main/config/assets/logo.png?raw=true",
+		Logger: logger}
 }
 
 func (es *DefaultEmailService) SendEmail(email *mail.SGMailV3) {
+	if es.Config.GetMailConfig().Provider == "" {
+		es.Logger.LogError(fmt.Errorf("no email provider has been set, update the configuration to enable email support"))
+		return
+	}
+
 	response, err := es.Client.Send(email)
 	if err != nil {
 		es.Logger.LogError(fmt.Errorf("failed to send email: %v", err.Error()))
@@ -65,24 +55,26 @@ func (es *DefaultEmailService) SendEmail(email *mail.SGMailV3) {
 	}
 }
 
+//go:embed templates/email_verify.html
+var templatesFS embed.FS
+
 func (es *DefaultEmailService) BuildVerificationEmail(firstName, lastName, toAddr, token string) *mail.SGMailV3 {
 	toName := firstName + " " + lastName
 
 	subject := "Verify email address"
 
-	link := es.ClientDomain + "/verify/" + token
+	link := es.Config.GetDomain() + "/verify/" + token
 
 	plainTextContent := "Follow this link to verify your email address: " + link
 
 	emailTemplate := "<p>Follow this link to verify your email address:&nbsp;</p><a>" + link + "</a>"
-	tmpl, err := template.ParseFiles("./config/assets/verify.html")
+
+	tmplPath := filepath.Join("templates", "email_verify.html")
+	tmpl, err := template.ParseFS(templatesFS, tmplPath)
 	if err == nil {
 		content := EmailContent{
-			Link:            link,
-			Logo:            es.Logo,
-			BackgroundColor: es.BackgroundColor,
-			FontColor:       es.FontColor,
-			LinkColor:       es.LinkColor,
+			Link: link,
+			Logo: es.Logo,
 		}
 
 		var body bytes.Buffer
@@ -95,7 +87,7 @@ func (es *DefaultEmailService) BuildVerificationEmail(firstName, lastName, toAdd
 		es.Logger.LogDebug(fmt.Sprintf("failed to parse html template: %v", err.Error()))
 	}
 
-	from := mail.NewEmail(es.SenderName, es.SenderAddr)
+	from := mail.NewEmail(es.Config.GetMailConfig().Sender.Name, es.Config.GetMailConfig().Sender.Address)
 	to := mail.NewEmail(toName, toAddr)
 
 	email := mail.NewSingleEmail(from, subject, to, plainTextContent, emailTemplate)

@@ -21,13 +21,13 @@ func TestWriteError(t *testing.T) {
 			name:           "CustomErrorBadRequest",
 			err:            httperrors.NewError(errors.New("some error"), http.StatusBadRequest),
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   "The request was invalid\n",
+			expectedBody:   "The request was invalid",
 		},
 		{
 			name:           "StandardError",
 			err:            errors.New("some error"),
 			expectedStatus: http.StatusInternalServerError,
-			expectedBody:   "Internal Server Error\n",
+			expectedBody:   "Internal Server Error",
 		},
 	}
 
@@ -74,8 +74,8 @@ func TestWrite(t *testing.T) {
 			name:                "UnmarshalablePayload",
 			payload:             make(chan int),
 			expectedStatus:      http.StatusInternalServerError,
-			expectedContentType: "text/plain; charset=utf-8",
-			expectedBody:        "Internal Server Error\n",
+			expectedContentType: "text/plain",
+			expectedBody:        "Internal Server Error",
 			expectedError:       true,
 		},
 	}
@@ -95,7 +95,7 @@ func TestWrite(t *testing.T) {
 
 			if tt.payload != nil {
 				if contentType := w.Header().Get("Content-Type"); contentType != tt.expectedContentType {
-					t.Errorf("expected Content-Type 'application/json'; got %q", contentType)
+					t.Errorf("expected Content-Type %q; got %q", tt.expectedContentType, contentType)
 				}
 				if !tt.expectedError {
 					if contentLength := w.Header().Get("Content-Length"); contentLength != fmt.Sprintf("%d", len(tt.expectedBody)) {

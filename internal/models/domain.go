@@ -7,6 +7,17 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
+type RealmRequest struct {
+	RealmName     string
+	RealmDomain   string
+	RefreshExp    string
+	AccessExp     string
+	EmailVerify   string
+	EmailProvider string
+	EmailSender   string
+	EmailAddr     string
+}
+
 type User struct {
 	UserID        int64     `json:"userID"`
 	UserUUID      string    `json:"userUUID"`

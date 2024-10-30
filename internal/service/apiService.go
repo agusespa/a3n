@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/exp/slices"
 
+	"github.com/agusespa/a3n/internal/helpers"
 	"github.com/agusespa/a3n/internal/httperrors"
 	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
@@ -30,68 +32,44 @@ type ApiService interface {
 	PutUserPassword(username, password, newPassword string) (int64, error)
 	GetUserData(id int64) (models.UserData, error)
 	GetUserLogin(username, password string) (models.UserAuthData, error)
-	GetUserAdminLogin(username, password, ipAddr string) (models.UserAuthData, error)
+	GetAdminUserLogin(username, password, ipAddr string) (models.UserAuthData, error)
 	GetFreshAccessToken(refreshToken string) (string, int64, error)
 	DeleteToken(refreshToken string) error
 	DeleteAllTokens(refreshToken string) error
-	ValidateToken(token string) (*models.CustomClaims, error)
+	ValidateToken(token string) (models.CustomClaims, error)
 	BuildCookie(name, value string, options models.CookieOptions) *http.Cookie
+	GenerateAdminSessionJWT(userID int64, userUUID string, roles []string, ipAddr string) (string, error)
+	AuthenticateAdminUser(token string, r *http.Request) (models.CustomClaims, error)
 }
 
 type DefaultApiService struct {
-	AuthRepo        repository.AuthRepository
-	EncryptionKey   []byte
-	RefreshTokenExp int
-	AccessTokenExp  int
-	EmailSrv        EmailService
-	HardVerify      bool
-	Domain          string
-	Logger          logger.Logger
+	AuthRepo      repository.AuthRepository
+	Config        ConfigService
+	EncryptionKey []byte
+	EmailSrv      EmailService
+	Logger        logger.Logger
 }
 
-func NewDefaultApiService(authRepo *repository.MySqlRepository, config models.ApiConfig, emailSrv EmailService, encryptionKey string, logger logger.Logger) *DefaultApiService {
-	var refreshExp int
-	if config.Token.RefreshExp == 0 {
-		refreshExp = 525600 // defaults to a year
-	} else {
-		refreshExp = config.Token.RefreshExp
-	}
-
-	var accessExp int
-	if config.Token.AccessExp == 0 {
-		accessExp = 5 // default to 5 minutes
-	} else {
-		accessExp = config.Token.AccessExp
-	}
-
+func NewDefaultApiService(authRepo *repository.MySqlRepository, config *DefaultConfigService, emailSrv EmailService, encryptionKey string, logger logger.Logger) *DefaultApiService {
 	return &DefaultApiService{
-		AuthRepo:        authRepo,
-		EncryptionKey:   []byte(encryptionKey),
-		RefreshTokenExp: refreshExp,
-		AccessTokenExp:  accessExp,
-		EmailSrv:        emailSrv,
-		HardVerify:      config.Email.HardVerify,
-		Domain:          config.Client.Domain,
-		Logger:          logger}
+		AuthRepo:      authRepo,
+		Config:        config,
+		EncryptionKey: []byte(encryptionKey),
+		EmailSrv:      emailSrv,
+		Logger:        logger}
 }
 
 func (as *DefaultApiService) PostUser(body models.UserRequest) (int64, error) {
 	if !IsValidEmail(body.Email) {
 		err := errors.New("not a valid email address")
-		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
+		as.Logger.LogError(err)
 		return 0, err
 	}
 	if !IsValidPassword(body.Password) {
 		err := errors.New("password doesn't meet minimum criteria")
-		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
-		return 0, err
-	}
-	if body.FirstName == "" || body.LastName == "" {
-		err := errors.New("name not provided")
 		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusBadRequest)
 		return 0, err
 	}
 
@@ -214,7 +192,7 @@ func (as *DefaultApiService) GetUserLogin(username, password string) (models.Use
 				as.EmailSrv.SendEmail(verificationEmail)
 			}
 		}()
-		if as.HardVerify {
+		if as.Config.GetMailConfig().HardVerify {
 			err := errors.New("email verification required")
 			as.Logger.LogError(err)
 			err = httperrors.NewError(err, http.StatusForbidden)
@@ -256,7 +234,7 @@ func (as *DefaultApiService) GetUserLogin(username, password string) (models.Use
 	return userAuthData, err
 }
 
-func (as *DefaultApiService) GetUserAdminLogin(username, password, ipAddr string) (models.UserAuthData, error) {
+func (as *DefaultApiService) GetAdminUserLogin(username, password, ipAddr string) (models.UserAuthData, error) {
 	var userAuthData models.UserAuthData
 
 	userEntity, err := as.AuthRepo.ReadUserByEmail(username)
@@ -275,8 +253,13 @@ func (as *DefaultApiService) GetUserAdminLogin(username, password, ipAddr string
 	if userEntity.Roles.Valid {
 		roles = strings.Split(userEntity.Roles.String, ",")
 	}
+	if !slices.Contains(roles, "admin") {
+		err = httperrors.NewError(errors.New("missing admin role"), http.StatusForbidden)
+		as.Logger.LogError(err)
+		return userAuthData, err
+	}
 
-	accessToken, err := as.generateAdminSessionJWT(userEntity.UserID, userEntity.UserUUID, roles, ipAddr)
+	accessToken, err := as.GenerateAdminSessionJWT(userEntity.UserID, userEntity.UserUUID, roles, ipAddr)
 	if err != nil {
 		return userAuthData, err
 	}
@@ -304,14 +287,13 @@ func (as *DefaultApiService) GetUserData(id int64) (models.UserData, error) {
 }
 
 func (as *DefaultApiService) GetFreshAccessToken(refreshToken string) (string, int64, error) {
-
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		return "", -1, err
 	}
 	userEntity, err := as.AuthRepo.ReadUserByToken(refreshTokenHash)
 	if err != nil {
-		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		return "", -1, err
 	}
@@ -323,6 +305,7 @@ func (as *DefaultApiService) GetFreshAccessToken(refreshToken string) (string, i
 
 	accessToken, err := as.generateAccessJWT(userEntity.UserID, userEntity.UserUUID, roles)
 	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		return "", -1, err
 	}
 
@@ -360,26 +343,24 @@ func (as *DefaultApiService) DeleteAllTokens(refreshToken string) error {
 	return nil
 }
 
-func (as *DefaultApiService) ValidateToken(token string) (*models.CustomClaims, error) {
+func (as *DefaultApiService) ValidateToken(token string) (models.CustomClaims, error) {
+	var claims models.CustomClaims
 	parsedToken, err := jwt.ParseWithClaims(
 		token,
-		&models.CustomClaims{},
+		&claims,
 		func(token *jwt.Token) (any, error) {
 			return as.EncryptionKey, nil
 		},
 	)
 	if err != nil {
 		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return &models.CustomClaims{}, err
+		return models.CustomClaims{}, httperrors.NewError(err, http.StatusUnauthorized)
 	}
 
-	claims, ok := parsedToken.Claims.(*models.CustomClaims)
-	if !ok {
-		err := errors.New("failed to parse token claims")
+	if !parsedToken.Valid {
+		err := errors.New("invalid token")
 		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return &models.CustomClaims{}, err
+		return models.CustomClaims{}, httperrors.NewError(err, http.StatusUnauthorized)
 	}
 
 	return claims, nil
@@ -397,7 +378,7 @@ func (as *DefaultApiService) hashPassword(password string) ([]byte, error) {
 }
 
 func (as *DefaultApiService) generateAccessJWT(userID int64, userUUID string, roles []string) (string, error) {
-	accessExpiresBy := time.Now().Add(time.Duration(as.AccessTokenExp) * time.Minute).Unix()
+	accessExpiresBy := time.Now().Add(time.Duration(as.Config.GetTokenConfig().AccessExp) * time.Minute).Unix()
 	claims := models.CustomClaims{
 		User: models.TokenUser{
 			UserID:   userID,
@@ -420,8 +401,8 @@ func (as *DefaultApiService) generateAccessJWT(userID int64, userUUID string, ro
 	return tokenString, nil
 }
 
-func (as *DefaultApiService) generateAdminSessionJWT(userID int64, userUUID string, roles []string, ipAddr string) (string, error) {
-	accessExpiresBy := time.Now().Add(time.Duration(10) * time.Minute).Unix()
+func (as *DefaultApiService) GenerateAdminSessionJWT(userID int64, userUUID string, roles []string, ipAddr string) (string, error) {
+	accessExpiresBy := time.Now().Add(time.Duration(15) * time.Minute).Unix()
 	claims := models.CustomClaims{
 		User: models.TokenUser{
 			UserID:   userID,
@@ -446,28 +427,20 @@ func (as *DefaultApiService) generateAdminSessionJWT(userID int64, userUUID stri
 }
 
 func (as *DefaultApiService) generateRefreshToken() (string, error) {
-	token := make([]byte, 96)
-	_, err := rand.Read(token)
+	tokenBytes := make([]byte, 32)
+	_, err := rand.Read(tokenBytes)
 	if err != nil {
 		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return "", err
+		return "", httperrors.NewError(err, http.StatusInternalServerError)
 	}
 
-	encodedToken := base64.StdEncoding.EncodeToString(token)
-	return encodedToken, nil
+	token := base64.URLEncoding.EncodeToString(tokenBytes)
+	return token, nil
 }
 
 func (as *DefaultApiService) hashRefreshToken(token string) ([]byte, error) {
-	decodedToken, err := base64.StdEncoding.DecodeString(token)
-	if err != nil {
-		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return nil, err
-	}
-
 	hasher := sha256.New()
-	hasher.Write(decodedToken)
+	hasher.Write([]byte(token))
 	hashedToken := hasher.Sum(nil)
 	return hashedToken, nil
 }
@@ -512,18 +485,46 @@ func IsValidPassword(password string) bool {
 func (as *DefaultApiService) BuildCookie(name, value string, options models.CookieOptions) *http.Cookie {
 	cookie := http.Cookie{
 		Name:     name,
-		Value:    base64.URLEncoding.EncodeToString([]byte(value)),
+		Value:    value,
 		Path:     options.Path,
 		HttpOnly: true,
 	}
 
 	switch options.Expiration {
 	case models.Access:
-		expiresBy := time.Now().Add(time.Duration(as.AccessTokenExp) * time.Minute)
+		expiresBy := time.Now().Add(time.Duration(as.Config.GetTokenConfig().AccessExp) * time.Minute)
 		cookie.Expires = expiresBy
 	case models.Refresh:
-		expiresBy := time.Now().Add(time.Duration(as.RefreshTokenExp) * time.Minute)
+		expiresBy := time.Now().Add(time.Duration(as.Config.GetTokenConfig().RefreshExp) * time.Minute)
+		cookie.Expires = expiresBy
+	default:
+		expiresBy := time.Now().Add(time.Duration(15) * time.Minute)
 		cookie.Expires = expiresBy
 	}
 	return &cookie
+}
+
+func (s *DefaultApiService) AuthenticateAdminUser(token string, r *http.Request) (models.CustomClaims, error) {
+	claims, err := s.ValidateToken(token)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		s.Logger.LogError(err)
+		return models.CustomClaims{}, err
+	}
+
+	if claims.IpAddr != helpers.GetIP(r) {
+		err := errors.New("invalid ip address")
+		s.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		return models.CustomClaims{}, err
+	}
+
+	if claims.Type != "admin" {
+		err := errors.New("invalid jwt claim")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		s.Logger.LogError(err)
+		return models.CustomClaims{}, err
+	}
+
+	return claims, nil
 }

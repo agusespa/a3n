@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"time"
@@ -24,6 +25,36 @@ var mockUser = models.UserAuthEntity{
 	PasswordHash:  []byte("hashed_password"),
 	EmailVerified: false,
 	CreatedAt:     time.Now(),
+}
+
+var mockValidRealm = models.RealmEntity{
+	RealmID:       1,
+	RealmName:     "browser",
+	RealmDomain:   "localhost:9001",
+	RefreshExp:    1440,
+	AccessExp:     5,
+	EmailVerify:   true,
+	EmailProvider: sql.NullString{String: "sendgrid", Valid: true},
+	EmailSender:   sql.NullString{String: "helpdesk", Valid: true},
+	EmailAddr:     sql.NullString{String: "help@mail.com", Valid: true},
+}
+
+var mockInvalidRealm = models.RealmEntity{
+	RealmID: 2,
+}
+
+func (m *MockAuthRepository) ReadRealmById(realmID int64) (models.RealmEntity, error) {
+	if realmID == mockValidRealm.RealmID {
+		return mockValidRealm, nil
+	}
+	if realmID == mockInvalidRealm.RealmID {
+		return mockInvalidRealm, nil
+	}
+	return models.RealmEntity{}, httperrors.NewError(errors.New("realm not found"), http.StatusNotFound)
+}
+
+func (m *MockAuthRepository) UpdateRealm(realm models.RealmEntity) error {
+	return nil
 }
 
 func (m *MockAuthRepository) CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error) {

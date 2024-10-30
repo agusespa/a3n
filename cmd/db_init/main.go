@@ -3,13 +3,12 @@ package main
 import (
 	"bufio"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 
-	"github.com/agusespa/a3n/internal/models"
+	"github.com/agusespa/a3n/internal/helpers"
 	"github.com/agusespa/a3n/internal/service"
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
@@ -18,26 +17,15 @@ import (
 )
 
 func main() {
-	dbPassword := os.Getenv("A3N_DB_PASSWORD")
-	if dbPassword == "" {
-		log.Fatal("failed to get DB_PASSWORD variable")
-	}
-
-	configFile, err := os.ReadFile("cmd/server/config/config.json")
+	dbUser, dbAddr, dbPassword, err := helpers.GetDatabaseVars()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Errorf("failed to get database variables: %s", err.Error()))
 	}
-	var config models.Config
-	err = json.Unmarshal(configFile, &config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	cfg := mysql.Config{
-		User:   config.Api.Database.User,
+		User:   dbUser,
 		Passwd: dbPassword,
 		Net:    "tcp",
-		Addr:   config.Api.Database.Address,
+		Addr:   dbAddr,
 	}
 
 	db, err := sql.Open("mysql", cfg.FormatDSN())
@@ -56,6 +44,30 @@ func main() {
 	if _, err := db.Exec("USE " + dbName); err != nil {
 		log.Fatal(err)
 	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS realms (
+			realm_id INT AUTO_INCREMENT PRIMARY KEY,
+			realm_name VARCHAR(20) NOT NULL UNIQUE,
+			realm_domain VARCHAR(100) NOT NULL DEFAULT "localhost:9001",
+			refresh_exp INT NOT NULL DEFAULT 1440,
+			access_exp INT NOT NULL DEFAULT 5,
+			email_verify BOOLEAN DEFAULT FALSE,
+			email_provider VARCHAR(36),
+			email_sender VARCHAR(36),
+			email_addr VARCHAR(100)
+		)
+	`)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Realms table ensured")
+
+	_, err = db.Exec("INSERT IGNORE INTO realms (realm_name) VALUES ('default')")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Default realm ensured")
 
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS users (

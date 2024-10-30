@@ -1,98 +1,196 @@
 package handlers
 
 import (
-	"encoding/base64"
+	"embed"
 	"errors"
 	"fmt"
+	"html/template"
 	"net/http"
+	"path/filepath"
 
-	"github.com/a-h/templ"
-	"github.com/agusespa/a3n/internal/helpers"
 	"github.com/agusespa/a3n/internal/httperrors"
 	"github.com/agusespa/a3n/internal/logger"
+	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/payload"
 	"github.com/agusespa/a3n/internal/service"
-	"github.com/agusespa/a3n/internal/templates"
 )
 
 type AdminHandler interface {
 	HandleAdminDashboard(w http.ResponseWriter, r *http.Request)
+	HandleAdminActions(w http.ResponseWriter, r *http.Request)
+	HandleAdminSettings(w http.ResponseWriter, r *http.Request)
 	HandleAdminLogin(w http.ResponseWriter, r *http.Request)
 }
 
 type DefaultAdminHandler struct {
-	ApiService service.ApiService
-	Logger     logger.Logger
+	ApiService   service.ApiService
+	RealmService service.RealmService
+	Config       service.ConfigService
+	Logger       logger.Logger
 }
 
-func NewDefaultAdminHandler(authService service.ApiService, logger logger.Logger) *DefaultAdminHandler {
-	return &DefaultAdminHandler{ApiService: authService, Logger: logger}
+func NewDefaultAdminHandler(authService service.ApiService, realmService service.RealmService, config service.ConfigService, logger logger.Logger) *DefaultAdminHandler {
+	return &DefaultAdminHandler{ApiService: authService, RealmService: realmService, Config: config, Logger: logger}
 }
+
+//go:embed templates/*.html
+var templatesFS embed.FS
 
 func (h *DefaultAdminHandler) HandleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
-	userID, err := h.authenticateAdminUser(r)
+	claims, err := h.getAuthClaims(r)
 	if err != nil {
-		w.Header().Set("HX-Redirect", "/a3n/admin/login")
-		payload.WriteError(w, r, err)
+		message := `<div class="error">Failed authentication</div>`
+		w.Header().Set("HX-Redirect", "/admin/login")
+		payload.WriteHTMLError(w, r, err, message)
 		return
 	}
 
-	data, err := h.ApiService.GetUserData(userID)
-	w.Header().Set("HX-Redirect", "/a3n/admin/login")
+	data, err := h.ApiService.GetUserData(claims.User.UserID)
 	if err != nil {
-		payload.WriteError(w, r, err)
+		h.Logger.LogError(err)
+		message := `<div class="error">Failed authentication</div>`
+		payload.WriteHTMLError(w, r, err, message)
 		return
 	}
 
-	adminComponent := templates.Dashboard(data)
-	templ.Handler(adminComponent).ServeHTTP(w, r)
+	tmplPath := filepath.Join("templates", "admin_dash_layout.html")
+	tmpl, err := template.ParseFS(templatesFS, tmplPath)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		h.Logger.LogError(err)
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		h.Logger.LogError(err)
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+}
+
+func (h *DefaultAdminHandler) getAuthClaims(r *http.Request) (models.CustomClaims, error) {
+	cookie, err := r.Cookie("refresh_token")
+	if err != nil {
+		err := errors.New("missing refresh token")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		return models.CustomClaims{}, err
+	}
+
+	claims, err := h.ApiService.AuthenticateAdminUser(cookie.Value, r)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		return models.CustomClaims{}, err
+	}
+	return claims, nil
+}
+
+func (h *DefaultAdminHandler) HandleAdminActions(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
+	_, err := h.getAuthClaims(r)
+	if err != nil {
+		message := `<div class="error">Failed authentication</div>`
+		w.Header().Set("HX-Redirect", "/admin/login")
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	tmplPath := filepath.Join("templates", "admin_dash_actions.html")
+	tmpl, err := template.ParseFS(templatesFS, tmplPath)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		h.Logger.LogError(err)
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		h.Logger.LogError(err)
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+}
+
+func (h *DefaultAdminHandler) HandleAdminSettings(w http.ResponseWriter, r *http.Request) {
+	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
+
+	_, err := h.getAuthClaims(r)
+	if err != nil {
+		message := `<div class="error">Failed authentication</div>`
+		w.Header().Set("HX-Redirect", "/admin/login")
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	realm, err := h.RealmService.GetRealmById(1)
+	if err != nil {
+		h.Logger.LogError(err)
+		message := `<div class="error">Failed request</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	tmplPath := filepath.Join("templates", "admin_dash_settings.html")
+	tmpl, err := template.ParseFS(templatesFS, tmplPath)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		h.Logger.LogError(err)
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
+
+	type TemplateData struct {
+		Realm     models.RealmEntity
+		Providers []string
+	}
+	data := TemplateData{
+		Realm:     realm,
+		Providers: h.Config.GetSupportedEmailProviders(),
+	}
+
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		h.Logger.LogError(err)
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
+	}
 }
 
 func (h *DefaultAdminHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
-	loginComponent := templates.Login()
-	templ.Handler(loginComponent).ServeHTTP(w, r)
-}
-
-func (h *DefaultAdminHandler) authenticateAdminUser(r *http.Request) (int64, error) {
-	bearerToken := ""
-
-	cookie, err := r.Cookie("access_token")
-	if err == nil {
-		decodedValue, err := base64.URLEncoding.DecodeString(cookie.Value)
-		if err == nil {
-			bearerToken = string(decodedValue)
-		}
-	}
-
-	if bearerToken == "" {
-		err := errors.New("missing access token")
-		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return 0, err
-	}
-
-	claims, err := h.ApiService.ValidateToken(bearerToken)
+	tmplPath := filepath.Join("templates", "admin_login.html")
+	tmpl, err := template.ParseFS(templatesFS, tmplPath)
 	if err != nil {
-		return 0, err
-	}
-
-	if claims.Type != "admin" {
-		err := errors.New("invalid jwt claim")
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return 0, err
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
 	}
 
-	if claims.IpAddr != helpers.GetIP(r) {
-		err := errors.New("invalid ip address")
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
 		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return 0, err
+		message := `<div class="error">Something went wrong</div>`
+		payload.WriteHTMLError(w, r, err, message)
+		return
 	}
-
-	return claims.User.UserID, nil
 }
