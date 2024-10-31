@@ -3,13 +3,14 @@ package mocks
 import "github.com/agusespa/a3n/internal/models"
 
 type MockConfigService struct {
-	Domain string
-	Token  models.Token
-	Email  models.Email
+	Domain                  string
+	Token                   models.Token
+	Email                   models.Email
+	SupportedEmailProviders []string
 }
 
 func NewMockConfigService() *MockConfigService {
-	provider := "sendgrid"
+	provider := "provider1"
 	senderName := "Test Sender"
 	senderAddr := "sender@example.com"
 	emailSender := models.Sender{Name: senderName, Address: senderAddr}
@@ -21,9 +22,10 @@ func NewMockConfigService() *MockConfigService {
 	tokenConfig := models.Token{RefreshExp: refreshExp, AccessExp: accessExp}
 
 	return &MockConfigService{
-		Domain: clientDomain,
-		Token:  tokenConfig,
-		Email:  emailConfig,
+		Domain:                  clientDomain,
+		Token:                   tokenConfig,
+		Email:                   emailConfig,
+		SupportedEmailProviders: []string{"provider1", "provider2"},
 	}
 }
 
@@ -44,7 +46,7 @@ func (cs *MockConfigService) GetDomain() string {
 }
 
 func (cs *MockConfigService) GetSupportedEmailProviders() []string {
-	return []string{"test"}
+	return cs.SupportedEmailProviders
 }
 
 func (cs *MockConfigService) SetRealmConfig(realm models.RealmEntity) {

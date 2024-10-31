@@ -3,12 +3,15 @@ package service
 import (
 	"testing"
 
+	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/mocks"
+	"github.com/stretchr/testify/assert"
 )
 
 func setupRealmService() *DefaultRealmService {
 	return &DefaultRealmService{
 		AuthRepo: mocks.NewMockAuthRepository(),
+		Config:   mocks.NewMockConfigService(),
 		Logger:   mocks.NewMockLogger(true),
 	}
 }
@@ -53,4 +56,84 @@ func TestGetRealmByIdWithInvalidData(t *testing.T) {
 	if err.Error() != expectedMessage {
 		t.Errorf("Expected error message to be '%s', got '%s'", expectedMessage, err.Error())
 	}
+}
+
+func TestPutRealm(t *testing.T) {
+	baseReq := models.RealmRequest{
+		RealmName:     "Valid Realm",
+		RealmDomain:   "valid.com",
+		RefreshExp:    "3600",
+		AccessExp:     "1800",
+		EmailVerify:   "on",
+		EmailAddr:     "valid@example.com",
+		EmailProvider: "provider2",
+		EmailSender:   "noreply@valid.com",
+	}
+
+	rs := setupRealmService()
+
+	t.Run("Success: Valid Input", func(t *testing.T) {
+		req := baseReq
+
+		err := rs.PutRealm(req)
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("Failure: Invalid Email Address", func(t *testing.T) {
+		req := baseReq
+		req.EmailAddr = "invalid-email"
+
+		err := rs.PutRealm(req)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("Failure: Invalid Refresh Expiration Value", func(t *testing.T) {
+		req := baseReq
+		req.RefreshExp = "invalid"
+
+		err := rs.PutRealm(req)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("Failure: Invalid Access Expiration Value", func(t *testing.T) {
+		req := baseReq
+		req.AccessExp = "invalid"
+
+		err := rs.PutRealm(req)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("Failure: Incomplete Email Configuration with Verification On", func(t *testing.T) {
+		req := baseReq
+		req.EmailProvider = ""
+
+		err := rs.PutRealm(req)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("Failure: Unsupported Email Provider", func(t *testing.T) {
+		req := baseReq
+		req.EmailProvider = "unsupported-provider"
+
+		err := rs.PutRealm(req)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("Success: Optional Email Fields", func(t *testing.T) {
+		req := baseReq
+		req.EmailAddr = ""
+		req.EmailProvider = ""
+		req.EmailSender = ""
+		req.EmailVerify = "off"
+
+		err := rs.PutRealm(req)
+
+		assert.NoError(t, err)
+	})
 }
