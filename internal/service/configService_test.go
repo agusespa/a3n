@@ -12,7 +12,7 @@ func TestGetMailConfig(t *testing.T) {
 	emailConfig := configService.GetMailConfig()
 
 	if emailConfig == nil {
-		t.Error("expected emailConfig to be not nil")
+		t.Fatal("expected emailConfig to be not nil")
 	}
 	if emailConfig.Provider != "sendgrid" {
 		t.Errorf("expected Provider to be 'sendgrid', got %s", emailConfig.Provider)
@@ -30,7 +30,7 @@ func TestGetTokenConfig(t *testing.T) {
 	tokenConfig := configService.GetTokenConfig()
 
 	if tokenConfig == nil {
-		t.Error("expected tokenConfig to be not nil")
+		t.Fatal("expected tokenConfig to be not nil")
 	}
 	if tokenConfig.RefreshExp != int64(1440) {
 		t.Errorf("expected RefreshExp to be 1440, got %d", tokenConfig.RefreshExp)
@@ -45,7 +45,7 @@ func TestGetDatabaseConfig(t *testing.T) {
 	databaseConfig := configService.GetDatabaseConfig()
 
 	if databaseConfig == nil {
-		t.Error("expected databaseConfig to be not nil")
+		t.Fatal("expected databaseConfig to be not nil")
 	}
 	if databaseConfig.User != "user" {
 		t.Errorf("expected User to be 'user', got %s", databaseConfig.User)
