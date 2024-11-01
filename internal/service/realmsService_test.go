@@ -5,7 +5,6 @@ import (
 
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/mocks"
-	"github.com/stretchr/testify/assert"
 )
 
 func setupRealmService() *DefaultRealmService {
@@ -76,8 +75,9 @@ func TestPutRealm(t *testing.T) {
 		req := baseReq
 
 		err := rs.PutRealm(req)
-
-		assert.NoError(t, err)
+		if err != nil {
+			t.Errorf("Expected no error, got error %s", err)
+		}
 	})
 
 	t.Run("Failure: Invalid Email Address", func(t *testing.T) {
@@ -85,8 +85,9 @@ func TestPutRealm(t *testing.T) {
 		req.EmailAddr = "invalid-email"
 
 		err := rs.PutRealm(req)
-
-		assert.Error(t, err)
+		if err == nil {
+			t.Fatalf("Expected an error, got nil")
+		}
 	})
 
 	t.Run("Failure: Invalid Refresh Expiration Value", func(t *testing.T) {
@@ -94,8 +95,9 @@ func TestPutRealm(t *testing.T) {
 		req.RefreshExp = "invalid"
 
 		err := rs.PutRealm(req)
-
-		assert.Error(t, err)
+		if err == nil {
+			t.Fatalf("Expected an error, got nil")
+		}
 	})
 
 	t.Run("Failure: Invalid Access Expiration Value", func(t *testing.T) {
@@ -103,8 +105,9 @@ func TestPutRealm(t *testing.T) {
 		req.AccessExp = "invalid"
 
 		err := rs.PutRealm(req)
-
-		assert.Error(t, err)
+		if err == nil {
+			t.Fatalf("Expected an error, got nil")
+		}
 	})
 
 	t.Run("Failure: Incomplete Email Configuration with Verification On", func(t *testing.T) {
@@ -112,8 +115,9 @@ func TestPutRealm(t *testing.T) {
 		req.EmailProvider = ""
 
 		err := rs.PutRealm(req)
-
-		assert.Error(t, err)
+		if err == nil {
+			t.Fatalf("Expected an error, got nil")
+		}
 	})
 
 	t.Run("Failure: Unsupported Email Provider", func(t *testing.T) {
@@ -121,8 +125,9 @@ func TestPutRealm(t *testing.T) {
 		req.EmailProvider = "unsupported-provider"
 
 		err := rs.PutRealm(req)
-
-		assert.Error(t, err)
+		if err == nil {
+			t.Fatalf("Expected an error, got nil")
+		}
 	})
 
 	t.Run("Success: Optional Email Fields", func(t *testing.T) {
@@ -133,7 +138,8 @@ func TestPutRealm(t *testing.T) {
 		req.EmailVerify = "off"
 
 		err := rs.PutRealm(req)
-
-		assert.NoError(t, err)
+		if err != nil {
+			t.Errorf("Expected no error, got error %s", err)
+		}
 	})
 }

@@ -9,10 +9,10 @@ import (
 	"github.com/agusespa/a3n/internal/database"
 	"github.com/agusespa/a3n/internal/handlers"
 	"github.com/agusespa/a3n/internal/helpers"
-	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/repository"
 	"github.com/agusespa/a3n/internal/service"
+	logger "github.com/agusespa/flogg"
 )
 
 var logg logger.Logger
@@ -37,7 +37,7 @@ func main() {
 	var devFlag bool
 	flag.BoolVar(&devFlag, "dev", false, "enable development mode")
 	flag.Parse()
-	logg = logger.NewLogger(devFlag)
+	logg = logger.NewLogger(devFlag, ".a3n")
 
 	encryptionKey, emailApiKey, err := helpers.GetApiKeyVars()
 	if err != nil {

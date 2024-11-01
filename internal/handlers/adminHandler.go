@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 
 	"github.com/agusespa/a3n/internal/httperrors"
-	"github.com/agusespa/a3n/internal/logger"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/payload"
 	"github.com/agusespa/a3n/internal/service"
+	logger "github.com/agusespa/flogg"
 )
 
 type AdminHandler interface {

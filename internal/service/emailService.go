@@ -7,7 +7,7 @@ import (
 	"html/template"
 	"path/filepath"
 
-	"github.com/agusespa/a3n/internal/logger"
+	logger "github.com/agusespa/flogg"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )

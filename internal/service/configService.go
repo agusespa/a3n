@@ -70,8 +70,9 @@ func (cs *DefaultConfigService) GetSupportedEmailProviders() []string {
 func (cs *DefaultConfigService) SetRealmConfig(realm models.RealmEntity) {
 	cs.Domain = realm.RealmDomain
 
-	updatedEmailConfig := models.Email{}
-	cs.Email = updatedEmailConfig
+	cs.Email.Sender = models.Sender{Name: realm.EmailSender.String, Address: realm.EmailAddr.String}
+	cs.Email.Provider = realm.EmailProvider.String
+	cs.Email.HardVerify = realm.EmailVerify
 
 	updatedTokenConfig := models.Token{RefreshExp: realm.RefreshExp, AccessExp: realm.AccessExp}
 	cs.Token = updatedTokenConfig
