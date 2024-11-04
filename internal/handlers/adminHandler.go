@@ -65,7 +65,7 @@ func (h *DefaultAdminHandler) HandleAdminDashboard(w http.ResponseWriter, r *htt
 		return
 	}
 
-	err = tmpl.Execute(w, data)
+	err = payload.WriteTemplate(tmpl, data, w, r)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
 		h.Logger.LogError(err)
@@ -114,7 +114,7 @@ func (h *DefaultAdminHandler) HandleAdminActions(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err = tmpl.Execute(w, nil)
+	err = payload.WriteTemplate(tmpl, nil, w, r)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
 		h.Logger.LogError(err)
@@ -162,7 +162,7 @@ func (h *DefaultAdminHandler) HandleAdminSettings(w http.ResponseWriter, r *http
 		Providers: h.Config.GetSupportedEmailProviders(),
 	}
 
-	err = tmpl.Execute(w, data)
+	err = payload.WriteTemplate(tmpl, data, w, r)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
 		h.Logger.LogError(err)
@@ -185,7 +185,7 @@ func (h *DefaultAdminHandler) HandleAdminLogin(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	err = tmpl.Execute(w, nil)
+	err = payload.WriteTemplate(tmpl, nil, w, r)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
 		h.Logger.LogError(err)
