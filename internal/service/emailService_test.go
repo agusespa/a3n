@@ -5,12 +5,13 @@ import (
 	"testing"
 
 	"github.com/agusespa/a3n/mocks"
+	logger "github.com/agusespa/flogg/testing"
 )
 
 func TestBuildVerificationEmail(t *testing.T) {
 	es := &DefaultEmailService{
 		Config: mocks.NewMockConfigService(),
-		Logger: mocks.NewMockLogger(false),
+		Logger: &logger.MockLogger{},
 	}
 	email := es.BuildVerificationEmail("John", "Doe", "john.doe@example.com", "test-token")
 

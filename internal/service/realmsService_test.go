@@ -5,13 +5,14 @@ import (
 
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/mocks"
+	logger "github.com/agusespa/flogg/testing"
 )
 
 func setupRealmService() *DefaultRealmService {
 	return &DefaultRealmService{
 		AuthRepo: mocks.NewMockAuthRepository(),
 		Config:   mocks.NewMockConfigService(),
-		Logger:   mocks.NewMockLogger(true),
+		Logger:   &logger.MockLogger{},
 	}
 }
 
