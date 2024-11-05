@@ -73,7 +73,12 @@ func (as *DefaultApiService) PostUser(body models.UserRequest) (int64, error) {
 		return 0, err
 	}
 
-	uuidStr := uuid.New().String()
+	var uuidStr string
+	if body.UserUUID == "" {
+		uuidStr = uuid.New().String()
+	} else {
+		uuidStr = body.UserUUID
+	}
 
 	hashedPassword, err := as.hashPassword(body.Password)
 	if err != nil {

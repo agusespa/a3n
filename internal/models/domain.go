@@ -37,6 +37,7 @@ type UserRequest struct {
 	LastName   string `json:"lastName"`
 	Email      string `json:"email"`
 	Password   string `json:"password"`
+	UserUUID   string `json:"userUUID"`
 }
 
 type RefreshToken struct {
