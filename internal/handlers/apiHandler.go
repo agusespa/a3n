@@ -632,11 +632,8 @@ func (h *DefaultApiHandler) HandleUserAuthentication(w http.ResponseWriter, r *h
 		payload.WriteError(w, r, err)
 	}
 
-	res := models.AuthenticationResponse{
-		UserUUID: claims.User.UserUUID,
-	}
-
-	payload.Write(w, r, res, nil)
+	w.Header().Set("X-User-UUID", claims.User.UserUUID)
+	payload.Write(w, r, nil, nil)
 }
 
 func (h *DefaultApiHandler) HandleTokenRevocation(w http.ResponseWriter, r *http.Request) {
