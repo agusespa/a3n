@@ -9,12 +9,13 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
-type AuthRepository interface {
+type AppRepository interface {
 	ReadRealmById(realmID int64) (models.RealmEntity, error)
 	UpdateRealm(realm models.RealmEntity) error
 	CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error)
 	ReadUserByEmail(email string) (models.UserAuthEntity, error)
 	ReadUserById(userID int64) (models.UserAuthEntity, error)
+	DeleteUserByUUID(uuid string) error
 	UpdateUserEmailVerification(email string) error
 	UpdateUserEmail(userID int64, email string) (int64, error)
 	UpdateUserPassword(userID int64, hashedPassword *[]byte) (int64, error)
@@ -45,7 +46,8 @@ func (repo *MySqlRepository) ReadRealmById(id int64) (models.RealmEntity, error)
 			r.email_verify, 
 			r.email_provider,
 			r.email_sender,
-			r.email_addr
+			r.email_addr,
+			r.api_key
 		FROM realms r
 		WHERE r.realm_id = ?
 	`
@@ -61,6 +63,7 @@ func (repo *MySqlRepository) ReadRealmById(id int64) (models.RealmEntity, error)
 		&realm.EmailProvider,
 		&realm.EmailSender,
 		&realm.EmailAddr,
+		&realm.ApiKey,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -215,7 +218,8 @@ func (repo *MySqlRepository) UpdateRealm(realm models.RealmEntity) error {
 			email_verify = ?, 
 			email_provider = ?, 
 			email_sender = ?, 
-			email_addr = ?
+			email_addr = ?,
+			api_key = ?
 		WHERE realm_id = ?
 	`
 
@@ -228,6 +232,7 @@ func (repo *MySqlRepository) UpdateRealm(realm models.RealmEntity) error {
 		realm.EmailProvider,
 		realm.EmailSender,
 		realm.EmailAddr,
+		realm.ApiKey,
 		realm.RealmID,
 	)
 	if err != nil {
@@ -312,6 +317,15 @@ func (repo *MySqlRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthE
 	}
 
 	return user, nil
+}
+
+func (repo *MySqlRepository) DeleteUserByUUID(uuid string) error {
+	_, err := repo.DB.Exec("DELETE FROM users WHERE user_uuid = ?", uuid)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		return err
+	}
+	return nil
 }
 
 func (repo *MySqlRepository) CreateRefreshToken(userID int64, tokenHash []byte) error {

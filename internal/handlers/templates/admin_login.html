@@ -106,11 +106,11 @@
     </head>
     <body>
         <form
-            hx-post="/api/login"
+            hx-post="/admin/auth"
             hx-trigger="submit"
             hx-target="#message"
             hx-swap="innerHTML"
-            hx-headers='{"Accept": "application/json+cookie, text/html", "X-Admin-Request": "true"}'
+            hx-headers='{"Accept": "application/json+cookie, text/html"}'
             hx-indicator="#loading"
             hx-disabled-elt="#loginButton"
         >

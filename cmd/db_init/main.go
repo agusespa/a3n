@@ -55,7 +55,8 @@ func main() {
 			email_verify BOOLEAN DEFAULT FALSE,
 			email_provider VARCHAR(36),
 			email_sender VARCHAR(36),
-			email_addr VARCHAR(100)
+			email_addr VARCHAR(100),
+			api_key VARCHAR(255)
 		)
 	`)
 	if err != nil {

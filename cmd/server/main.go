@@ -54,43 +54,51 @@ func main() {
 		logg.LogFatal(fmt.Errorf("failed to establish database connection: %s", err.Error()))
 	}
 
-	authRepository := repository.NewMySqlRepository(db)
+	appRepository := repository.NewMySqlRepository(db)
 
-	apiConfig := &service.DefaultConfigService{}
+	appConfig := &service.DefaultConfigService{}
 
-	realmService := service.NewDefaultRealmService(authRepository, apiConfig, logg)
+	realmService := service.NewDefaultRealmService(appRepository, appConfig, logg)
 	realmEntity, err := realmService.GetRealmById(1)
 	if err != nil {
 		logg.LogFatal(fmt.Errorf("failed to read realm settings: %s", err.Error()))
 	}
 
-	*apiConfig = *service.NewDefaultConfigService(realmEntity, databaseConfig, emailApiKey)
+	*appConfig = *service.NewDefaultConfigService(realmEntity, databaseConfig, emailApiKey)
 
-	emailService := service.NewDefaultEmailService(apiConfig, logg)
+	emailService := service.NewDefaultEmailService(appConfig, logg)
 
-	apiService := service.NewDefaultApiService(authRepository, apiConfig, emailService, encryptionKey, logg)
+	authService := service.NewDefaultAuthService(appRepository, appConfig, emailService, encryptionKey, logg)
 
-	apiHandler := handlers.NewDefaultApiHandler(apiService, realmService, logg)
+	authHandler := handlers.NewDefaultAuthHandler(authService, logg)
 
-	adminHandler := handlers.NewDefaultAdminHandler(apiService, realmService, apiConfig, logg)
+	adminHandler := handlers.NewDefaultAdminHandler(authService, realmService, appConfig, logg)
+
+	realmHandler := handlers.NewDefaultRealmHandler(realmService, logg)
+
+	apiHandler := handlers.NewDefaultApiHandler(authService, logg)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/realm", apiHandler.HandleRealm)
-	mux.HandleFunc("/api/register", apiHandler.HandleUserRegister)
-	mux.HandleFunc("/api/login", apiHandler.HandleLogin)
-	mux.HandleFunc("/api/user/email/verify", apiHandler.HandleUserEmailVerification)
-	mux.HandleFunc("/api/user/email", apiHandler.HandleUserEmailChange)
-	mux.HandleFunc("/api/user/password", apiHandler.HandleUserPasswordChange)
-	mux.HandleFunc("/api/user", apiHandler.HandleUserData)
-	mux.HandleFunc("/api/authenticate", apiHandler.HandleUserAuthentication)
-	mux.HandleFunc("/api/refresh", apiHandler.HandleRefresh)
-	mux.HandleFunc("/api/logout/all", apiHandler.HandleAllUserTokensRevocation)
-	mux.HandleFunc("/api/logout", apiHandler.HandleTokenRevocation)
+	mux.HandleFunc("/auth/login", authHandler.HandleUserLogin)
+	mux.HandleFunc("/auth/authenticate", authHandler.HandleUserAuthentication)
+	mux.HandleFunc("/auth/refresh", authHandler.HandleUserRefresh)
+	mux.HandleFunc("/auth/user/verify", authHandler.HandleUserEmailVerification)
+	mux.HandleFunc("/auth/user/email", authHandler.HandleUserEmailChange)
+	mux.HandleFunc("/auth/user/password", authHandler.HandleUserPasswordChange)
+	mux.HandleFunc("/auth/user", authHandler.HandleUserData)
+	mux.HandleFunc("/auth/globallogout", authHandler.HandleAllUserTokensRevocation)
+	mux.HandleFunc("/auth/singlelogout", authHandler.HandleTokenRevocation)
 
-	mux.HandleFunc("/admin/login", adminHandler.HandleAdminLogin)
-	mux.HandleFunc("/admin/dashboard/settings", adminHandler.HandleAdminSettings)
-	mux.HandleFunc("/admin/dashboard/actions", adminHandler.HandleAdminActions)
-	mux.HandleFunc("/admin/dashboard", adminHandler.HandleAdminDashboard)
+	mux.HandleFunc("/admin/login", adminHandler.HandleAdminLoginPage)
+	mux.HandleFunc("/admin/dashboard/settings", adminHandler.HandleAdminSettingsPage)
+	mux.HandleFunc("/admin/dashboard/actions", adminHandler.HandleAdminActionsPage)
+	mux.HandleFunc("/admin/dashboard", adminHandler.HandleAdminDashboardPage)
+	mux.HandleFunc("/admin/auth", adminHandler.HandleAdminAuth)
+	mux.HandleFunc("/admin/refresh", adminHandler.HandleAdminRefresh)
+
+	mux.HandleFunc("/realm", realmHandler.HandleRealm)
+
+	mux.HandleFunc("/api/user", apiHandler.HandleUserData)
 
 	port := os.Getenv("A3N_PORT")
 	if port == "" {

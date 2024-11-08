@@ -101,11 +101,8 @@
                 const now = Date.now();
 
                 if (now - lastActivityTime <= t) {
-                    htmx.ajax("GET", "/api/refresh", {
+                    htmx.ajax("GET", "/admin/refresh", {
                         swap: "none",
-                        headers: {
-                            "X-Admin-Request": "true",
-                        },
                         error: function (response) {
                             window.location.href = "/a3n/admin/login";
                         },

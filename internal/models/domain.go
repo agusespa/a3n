@@ -16,6 +16,7 @@ type RealmRequest struct {
 	EmailProvider string
 	EmailSender   string
 	EmailAddr     string
+	ApiKey        string
 }
 
 type User struct {

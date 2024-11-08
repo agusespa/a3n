@@ -19,20 +19,20 @@ type RealmService interface {
 }
 
 type DefaultRealmService struct {
-	AuthRepo repository.AuthRepository
-	Config   ConfigService
-	Logger   logger.Logger
+	AppRepo repository.AppRepository
+	Config  ConfigService
+	Logger  logger.Logger
 }
 
-func NewDefaultRealmService(authRepo *repository.MySqlRepository, config *DefaultConfigService, logger logger.Logger) *DefaultRealmService {
+func NewDefaultRealmService(appRepo *repository.MySqlRepository, config *DefaultConfigService, logger logger.Logger) *DefaultRealmService {
 	return &DefaultRealmService{
-		AuthRepo: authRepo,
-		Config:   config,
-		Logger:   logger}
+		AppRepo: appRepo,
+		Config:  config,
+		Logger:  logger}
 }
 
 func (rs *DefaultRealmService) GetRealmById(realmID int64) (models.RealmEntity, error) {
-	realm, err := rs.AuthRepo.ReadRealmById(realmID)
+	realm, err := rs.AppRepo.ReadRealmById(realmID)
 	if err != nil {
 		rs.Logger.LogError(err)
 		return models.RealmEntity{}, err
@@ -97,6 +97,8 @@ func (rs *DefaultRealmService) PutRealm(req models.RealmRequest) error {
 		return err
 	}
 
+	apiKey := helpers.ParseNullString(req.ApiKey)
+
 	realm := models.RealmEntity{
 		RealmID:       1,
 		RealmName:     req.RealmName,
@@ -107,9 +109,10 @@ func (rs *DefaultRealmService) PutRealm(req models.RealmRequest) error {
 		EmailAddr:     emailAddr,
 		EmailProvider: emailProvider,
 		EmailSender:   emailSender,
+		ApiKey:        apiKey,
 	}
 
-	err = rs.AuthRepo.UpdateRealm(realm)
+	err = rs.AppRepo.UpdateRealm(realm)
 	if err != nil {
 		rs.Logger.LogError(err)
 		return err

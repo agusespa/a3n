@@ -10,9 +10,9 @@ import (
 
 func setupRealmService() *DefaultRealmService {
 	return &DefaultRealmService{
-		AuthRepo: mocks.NewMockAuthRepository(),
-		Config:   mocks.NewMockConfigService(),
-		Logger:   &logger.MockLogger{},
+		AppRepo: mocks.NewMockAppRepository(),
+		Config:  mocks.NewMockConfigService(),
+		Logger:  &logger.MockLogger{},
 	}
 }
 

@@ -15,6 +15,7 @@ type RealmEntity struct {
 	EmailProvider sql.NullString `db:"email_provider"`
 	EmailSender   sql.NullString `db:"email_sender"`
 	EmailAddr     sql.NullString `db:"email_addr"`
+	ApiKey        sql.NullString `db:"api_key"`
 }
 
 type UserAuthEntity struct {

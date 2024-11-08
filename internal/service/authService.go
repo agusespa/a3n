@@ -24,8 +24,9 @@ import (
 	email "github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
-type ApiService interface {
+type AuthService interface {
 	PostUser(body models.UserRequest) (int64, error)
+	DeleteUser(uuid string) error
 	BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error)
 	PutUserEmailVerification(email string) error
 	PutUserEmail(username, password, newEmail string) (int64, error)
@@ -42,24 +43,24 @@ type ApiService interface {
 	AuthenticateAdminUser(token string, r *http.Request) (models.CustomClaims, error)
 }
 
-type DefaultApiService struct {
-	AuthRepo      repository.AuthRepository
+type DefaultAuthService struct {
+	AppRepo       repository.AppRepository
 	Config        ConfigService
 	EncryptionKey []byte
 	EmailSrv      EmailService
 	Logger        logger.Logger
 }
 
-func NewDefaultApiService(authRepo *repository.MySqlRepository, config *DefaultConfigService, emailSrv EmailService, encryptionKey string, logger logger.Logger) *DefaultApiService {
-	return &DefaultApiService{
-		AuthRepo:      authRepo,
+func NewDefaultAuthService(appRepo *repository.MySqlRepository, config *DefaultConfigService, emailSrv EmailService, encryptionKey string, logger logger.Logger) *DefaultAuthService {
+	return &DefaultAuthService{
+		AppRepo:       appRepo,
 		Config:        config,
 		EncryptionKey: []byte(encryptionKey),
 		EmailSrv:      emailSrv,
 		Logger:        logger}
 }
 
-func (as *DefaultApiService) PostUser(body models.UserRequest) (int64, error) {
+func (as *DefaultAuthService) PostUser(body models.UserRequest) (int64, error) {
 	if !IsValidEmail(body.Email) {
 		err := errors.New("not a valid email address")
 		err = httperrors.NewError(err, http.StatusBadRequest)
@@ -85,7 +86,7 @@ func (as *DefaultApiService) PostUser(body models.UserRequest) (int64, error) {
 		return 0, err
 	}
 
-	id, err := as.AuthRepo.CreateUser(uuidStr, body, hashedPassword)
+	id, err := as.AppRepo.CreateUser(uuidStr, body, hashedPassword)
 	if err != nil {
 		as.Logger.LogError(err)
 		return 0, err
@@ -101,7 +102,16 @@ func (as *DefaultApiService) PostUser(body models.UserRequest) (int64, error) {
 	return id, nil
 }
 
-func (as *DefaultApiService) BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error) {
+func (as *DefaultAuthService) DeleteUser(uuid string) error {
+	if err := as.AppRepo.DeleteUserByUUID(uuid); err != nil {
+		as.Logger.LogError(err)
+		return err
+	}
+
+	return nil
+}
+
+func (as *DefaultAuthService) BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error) {
 	token, err := as.generateEmailVerifyJWT(email)
 	if err != nil {
 		return nil, err
@@ -110,15 +120,15 @@ func (as *DefaultApiService) BuildVerificationEmail(firstName, lastName, email s
 	return as.EmailSrv.BuildVerificationEmail(firstName, lastName, email, token), nil
 }
 
-func (as *DefaultApiService) PutUserEmailVerification(email string) error {
-	err := as.AuthRepo.UpdateUserEmailVerification(email)
+func (as *DefaultAuthService) PutUserEmailVerification(email string) error {
+	err := as.AppRepo.UpdateUserEmailVerification(email)
 	if err != nil {
 		as.Logger.LogError(err)
 	}
 	return err
 }
 
-func (as *DefaultApiService) PutUserEmail(username, password, newEmail string) (int64, error) {
+func (as *DefaultAuthService) PutUserEmail(username, password, newEmail string) (int64, error) {
 	if !IsValidEmail(newEmail) {
 		err := errors.New("not a valid email address")
 		as.Logger.LogError(err)
@@ -126,7 +136,7 @@ func (as *DefaultApiService) PutUserEmail(username, password, newEmail string) (
 		return 0, err
 	}
 
-	userData, err := as.AuthRepo.ReadUserByEmail(username)
+	userData, err := as.AppRepo.ReadUserByEmail(username)
 	if err != nil {
 		as.Logger.LogError(err)
 		return 0, err
@@ -138,7 +148,7 @@ func (as *DefaultApiService) PutUserEmail(username, password, newEmail string) (
 		return 0, err
 	}
 
-	id, err := as.AuthRepo.UpdateUserEmail(userData.UserID, newEmail)
+	id, err := as.AppRepo.UpdateUserEmail(userData.UserID, newEmail)
 	if err != nil {
 		as.Logger.LogError(err)
 		return 0, err
@@ -147,7 +157,7 @@ func (as *DefaultApiService) PutUserEmail(username, password, newEmail string) (
 	return id, nil
 }
 
-func (as *DefaultApiService) PutUserPassword(username, password, newPassword string) (int64, error) {
+func (as *DefaultAuthService) PutUserPassword(username, password, newPassword string) (int64, error) {
 	if !IsValidPassword(newPassword) {
 		err := errors.New("password doesn't meet minimum criteria")
 		as.Logger.LogError(err)
@@ -155,7 +165,7 @@ func (as *DefaultApiService) PutUserPassword(username, password, newPassword str
 		return 0, err
 	}
 
-	userData, err := as.AuthRepo.ReadUserByEmail(username)
+	userData, err := as.AppRepo.ReadUserByEmail(username)
 	if err != nil {
 		as.Logger.LogError(err)
 		return 0, err
@@ -172,7 +182,7 @@ func (as *DefaultApiService) PutUserPassword(username, password, newPassword str
 		return 0, err
 	}
 
-	id, err := as.AuthRepo.UpdateUserPassword(userData.UserID, &hashedPassword)
+	id, err := as.AppRepo.UpdateUserPassword(userData.UserID, &hashedPassword)
 	if err != nil {
 		as.Logger.LogError(err)
 		return 0, err
@@ -181,10 +191,10 @@ func (as *DefaultApiService) PutUserPassword(username, password, newPassword str
 	return id, nil
 }
 
-func (as *DefaultApiService) GetUserLogin(username, password string) (models.UserAuthData, error) {
+func (as *DefaultAuthService) GetUserLogin(username, password string) (models.UserAuthData, error) {
 	var userAuthData models.UserAuthData
 
-	userEntity, err := as.AuthRepo.ReadUserByEmail(username)
+	userEntity, err := as.AppRepo.ReadUserByEmail(username)
 	if err != nil {
 		as.Logger.LogError(err)
 		return userAuthData, err
@@ -220,7 +230,7 @@ func (as *DefaultApiService) GetUserLogin(username, password string) (models.Use
 	if err != nil {
 		return userAuthData, err
 	}
-	if err := as.AuthRepo.CreateRefreshToken(userEntity.UserID, refreshTokenHash); err != nil {
+	if err := as.AppRepo.CreateRefreshToken(userEntity.UserID, refreshTokenHash); err != nil {
 		as.Logger.LogError(err)
 		return userAuthData, err
 	}
@@ -239,10 +249,10 @@ func (as *DefaultApiService) GetUserLogin(username, password string) (models.Use
 	return userAuthData, err
 }
 
-func (as *DefaultApiService) GetAdminUserLogin(username, password, ipAddr string) (models.UserAuthData, error) {
+func (as *DefaultAuthService) GetAdminUserLogin(username, password, ipAddr string) (models.UserAuthData, error) {
 	var userAuthData models.UserAuthData
 
-	userEntity, err := as.AuthRepo.ReadUserByEmail(username)
+	userEntity, err := as.AppRepo.ReadUserByEmail(username)
 	if err != nil {
 		as.Logger.LogError(err)
 		return userAuthData, err
@@ -273,10 +283,10 @@ func (as *DefaultApiService) GetAdminUserLogin(username, password, ipAddr string
 	return userAuthData, err
 }
 
-func (as *DefaultApiService) GetUserData(id int64) (models.UserData, error) {
+func (as *DefaultAuthService) GetUserData(id int64) (models.UserData, error) {
 	var userData models.UserData
 
-	userEntity, err := as.AuthRepo.ReadUserById(id)
+	userEntity, err := as.AppRepo.ReadUserById(id)
 	if err != nil {
 		as.Logger.LogError(err)
 		return userData, err
@@ -291,13 +301,13 @@ func (as *DefaultApiService) GetUserData(id int64) (models.UserData, error) {
 	return userData, err
 }
 
-func (as *DefaultApiService) GetFreshAccessToken(refreshToken string) (string, int64, error) {
+func (as *DefaultAuthService) GetFreshAccessToken(refreshToken string) (string, int64, error) {
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		return "", -1, err
 	}
-	userEntity, err := as.AuthRepo.ReadUserByToken(refreshTokenHash)
+	userEntity, err := as.AppRepo.ReadUserByToken(refreshTokenHash)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		return "", -1, err
@@ -317,12 +327,12 @@ func (as *DefaultApiService) GetFreshAccessToken(refreshToken string) (string, i
 	return accessToken, userEntity.UserID, nil
 }
 
-func (as *DefaultApiService) DeleteToken(refreshToken string) error {
+func (as *DefaultAuthService) DeleteToken(refreshToken string) error {
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
 		return err
 	}
-	if err := as.AuthRepo.DeleteTokenByHash(refreshTokenHash); err != nil {
+	if err := as.AppRepo.DeleteTokenByHash(refreshTokenHash); err != nil {
 		as.Logger.LogError(err)
 		return err
 	}
@@ -330,17 +340,17 @@ func (as *DefaultApiService) DeleteToken(refreshToken string) error {
 	return nil
 }
 
-func (as *DefaultApiService) DeleteAllTokens(refreshToken string) error {
+func (as *DefaultAuthService) DeleteAllTokens(refreshToken string) error {
 	refreshTokenHash, err := as.hashRefreshToken(refreshToken)
 	if err != nil {
 		return err
 	}
-	userData, err := as.AuthRepo.ReadUserByToken(refreshTokenHash)
+	userData, err := as.AppRepo.ReadUserByToken(refreshTokenHash)
 	if err != nil {
 		as.Logger.LogError(err)
 		return err
 	}
-	if err := as.AuthRepo.DeleteAllTokensByUserId(userData.UserID); err != nil {
+	if err := as.AppRepo.DeleteAllTokensByUserId(userData.UserID); err != nil {
 		as.Logger.LogError(err)
 		return err
 	}
@@ -348,7 +358,7 @@ func (as *DefaultApiService) DeleteAllTokens(refreshToken string) error {
 	return nil
 }
 
-func (as *DefaultApiService) ValidateToken(token string) (models.CustomClaims, error) {
+func (as *DefaultAuthService) ValidateToken(token string) (models.CustomClaims, error) {
 	var claims models.CustomClaims
 	parsedToken, err := jwt.ParseWithClaims(
 		token,
@@ -371,7 +381,7 @@ func (as *DefaultApiService) ValidateToken(token string) (models.CustomClaims, e
 	return claims, nil
 }
 
-func (as *DefaultApiService) hashPassword(password string) ([]byte, error) {
+func (as *DefaultAuthService) hashPassword(password string) ([]byte, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		as.Logger.LogError(err)
@@ -382,7 +392,7 @@ func (as *DefaultApiService) hashPassword(password string) ([]byte, error) {
 	return hashedPassword, nil
 }
 
-func (as *DefaultApiService) generateAccessJWT(userID int64, userUUID string, roles []string) (string, error) {
+func (as *DefaultAuthService) generateAccessJWT(userID int64, userUUID string, roles []string) (string, error) {
 	accessExpiresBy := time.Now().Add(time.Duration(as.Config.GetTokenConfig().AccessExp) * time.Minute).Unix()
 	claims := models.CustomClaims{
 		User: models.TokenUser{
@@ -406,7 +416,7 @@ func (as *DefaultApiService) generateAccessJWT(userID int64, userUUID string, ro
 	return tokenString, nil
 }
 
-func (as *DefaultApiService) GenerateAdminSessionJWT(userID int64, userUUID string, roles []string, ipAddr string) (string, error) {
+func (as *DefaultAuthService) GenerateAdminSessionJWT(userID int64, userUUID string, roles []string, ipAddr string) (string, error) {
 	accessExpiresBy := time.Now().Add(time.Duration(15) * time.Minute).Unix()
 	claims := models.CustomClaims{
 		User: models.TokenUser{
@@ -431,7 +441,7 @@ func (as *DefaultApiService) GenerateAdminSessionJWT(userID int64, userUUID stri
 	return tokenString, nil
 }
 
-func (as *DefaultApiService) generateRefreshToken() (string, error) {
+func (as *DefaultAuthService) generateRefreshToken() (string, error) {
 	tokenBytes := make([]byte, 32)
 	_, err := rand.Read(tokenBytes)
 	if err != nil {
@@ -443,14 +453,14 @@ func (as *DefaultApiService) generateRefreshToken() (string, error) {
 	return token, nil
 }
 
-func (as *DefaultApiService) hashRefreshToken(token string) ([]byte, error) {
+func (as *DefaultAuthService) hashRefreshToken(token string) ([]byte, error) {
 	hasher := sha256.New()
 	hasher.Write([]byte(token))
 	hashedToken := hasher.Sum(nil)
 	return hashedToken, nil
 }
 
-func (as *DefaultApiService) generateEmailVerifyJWT(email string) (string, error) {
+func (as *DefaultAuthService) generateEmailVerifyJWT(email string) (string, error) {
 	expiration := time.Now().Add(60 * time.Minute).Unix()
 	claims := models.CustomClaims{
 		Email: email,
@@ -487,7 +497,7 @@ func IsValidPassword(password string) bool {
 	return match
 }
 
-func (as *DefaultApiService) BuildCookie(name, value string, options models.CookieOptions) *http.Cookie {
+func (as *DefaultAuthService) BuildCookie(name, value string, options models.CookieOptions) *http.Cookie {
 	cookie := http.Cookie{
 		Name:     name,
 		Value:    value,
@@ -509,7 +519,7 @@ func (as *DefaultApiService) BuildCookie(name, value string, options models.Cook
 	return &cookie
 }
 
-func (s *DefaultApiService) AuthenticateAdminUser(token string, r *http.Request) (models.CustomClaims, error) {
+func (s *DefaultAuthService) AuthenticateAdminUser(token string, r *http.Request) (models.CustomClaims, error) {
 	claims, err := s.ValidateToken(token)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusUnauthorized)

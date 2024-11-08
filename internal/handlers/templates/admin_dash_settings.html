@@ -15,6 +15,23 @@
             gap: 0.5rem;
             height: 2.5rem;
         }
+        .form-group button {
+            width: auto;
+            padding: 6px 12px;
+            background-color: #000;
+            border: 1px solid #fff;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .form-group button:hover {
+            background-color: #fff;
+            color: #000;
+        }
+        .warning-message {
+            font-size: 11px;
+            color: orange;
+        }
         label {
             width: 200px;
         }
@@ -30,7 +47,12 @@
             height: 2rem;
             padding-left: 0.5rem;
         }
-        button {
+        .submit-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .submit-container .submit-button {
             width: 10rem;
             margin-top: 18px;
             padding: 12px;
@@ -41,16 +63,10 @@
             text-transform: uppercase;
             letter-spacing: 2px;
             cursor: pointer;
-            box-sizing: border-box;
         }
-        button:hover {
+        .submit-container .submit-button:hover {
             background-color: #fff;
             color: #000;
-        }
-        .submit-container {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
         }
         .indicator {
             display: none;
@@ -72,14 +88,24 @@
             color: #ff0000;
         }
     </style>
+    <script>
+        function generateApiKey() {
+            const apiKey = Array.from(
+                crypto.getRandomValues(new Uint8Array(16))
+            )
+                .map((b) => b.toString(16).padStart(2, "0"))
+                .join("");
+            document.getElementById("api_key").value = apiKey;
+        }
+    </script>
 
     <h1>Realm Settings</h1>
 
     <form
-        hx-put="/api/realm"
+        hx-put="/realm"
         hx-trigger="submit"
         hx-target="#message"
-        hx-headers='{"Accept": "application/json+cookie, text/html", "X-Admin-Request": "true"}'
+        hx-headers='{"Accept": "application/json+cookie, text/html"}'
         hx-indicator="#loading"
         hx-disabled-elt="#loginButton"
     >
@@ -190,8 +216,25 @@
             />
         </div>
 
+        <div class="form-group">
+            <label for="api_key">API Key:</label>
+            <input
+                readonly
+                type="text"
+                id="api_key"
+                name="api_key"
+                value="{{if .Realm.ApiKey.Valid}}{{.Realm.ApiKey.String}}{{end}}"
+            />
+            <button type="button" onclick="generateApiKey()">
+                Generate API Key
+            </button>
+            <p class="warning-message">
+                Generating a new key will remove the current one
+            </p>
+        </div>
+
         <div class="submit-container">
-            <button type="submit" id="submit-btn">
+            <button type="submit" class="submit-button">
                 Save
                 <span id="loading" class="indicator">...</span>
             </button>

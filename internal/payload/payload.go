@@ -143,7 +143,7 @@ func WriteTemplate(tmpl *template.Template, data interface{}, w http.ResponseWri
 		gz := gzipResponseWriter{ResponseWriter: w, Writer: gzipWriter}
 		w = gz
 	}
-	return tmpl.Execute(w, nil)
+	return tmpl.Execute(w, data)
 }
 
 func isHTML(s string) bool {
