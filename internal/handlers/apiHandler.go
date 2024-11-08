@@ -60,8 +60,10 @@ func (h *DefaultApiHandler) handleGetUserData(w http.ResponseWriter, r *http.Req
 	uuidStr := r.URL.Query().Get("uuid")
 	if uuidStr != "" {
 		// TODO get by uuid
+		return
 	} else {
 		// TODO get all
+		return
 	}
 }
 
