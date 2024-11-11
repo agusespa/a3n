@@ -111,6 +111,10 @@ func (m *MockAppRepository) DeleteUserByUUID(uuid string) error {
 	return nil
 }
 
+func (m *MockAppRepository) DeleteUserByID(id int64) error {
+	return nil
+}
+
 func (m *MockAppRepository) DeleteTokenByHash(tokenHash []byte) error {
 	return nil
 }

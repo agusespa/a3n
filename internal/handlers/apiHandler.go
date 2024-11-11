@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/agusespa/a3n/internal/httperrors"
 	"github.com/agusespa/a3n/internal/models"
@@ -20,33 +19,36 @@ type ApiHandler interface {
 
 type DefaultApiHandler struct {
 	AuthService service.AuthService
+	Config      service.ConfigService
 	Logger      logger.Logger
 }
 
-func NewDefaultApiHandler(apiService service.AuthService, logger logger.Logger) *DefaultAuthHandler {
-	return &DefaultAuthHandler{AuthService: apiService, Logger: logger}
+func NewDefaultApiHandler(authService service.AuthService, config service.ConfigService, logger logger.Logger) *DefaultApiHandler {
+	return &DefaultApiHandler{AuthService: authService, Config: config, Logger: logger}
 }
 
 func (h *DefaultApiHandler) HandleUserData(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
-	bearerToken := ""
-	authHeader := r.Header.Get("Authorization")
-	bearerToken = strings.Split(authHeader, " ")[1]
-
-	if bearerToken == "" {
-		err := errors.New("missing api key")
-		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
-		return
-	}
-
 	if r.Method == http.MethodGet {
+		err := h.authenticateRequest(r)
+		if err != nil {
+			err = httperrors.NewError(err, http.StatusUnauthorized)
+			h.Logger.LogError(err)
+			payload.WriteError(w, r, err)
+			return
+		}
 		h.handleGetUserData(w, r)
 	} else if r.Method == http.MethodPost {
 		h.handlePostUserData(w, r)
 	} else if r.Method == http.MethodDelete {
+		err := h.authenticateRequest(r)
+		if err != nil {
+			err = httperrors.NewError(err, http.StatusUnauthorized)
+			h.Logger.LogError(err)
+			payload.WriteError(w, r, err)
+			return
+		}
 		h.handleDeleteUserData(w, r)
 	} else {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
@@ -54,6 +56,22 @@ func (h *DefaultApiHandler) HandleUserData(w http.ResponseWriter, r *http.Reques
 		payload.WriteError(w, r, err)
 		return
 	}
+}
+
+func (h *DefaultApiHandler) authenticateRequest(r *http.Request) error {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		err := errors.New("missing api key")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		return err
+	}
+
+	if authHeader == h.Config.GetApiKey() {
+		err := errors.New("invalid api key")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		return err
+	}
+	return nil
 }
 
 func (h *DefaultApiHandler) handleGetUserData(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +95,7 @@ func (h *DefaultApiHandler) handleDeleteUserData(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err := h.AuthService.DeleteUser(uuidStr)
+	err := h.AuthService.DeleteUserByUUID(uuidStr)
 	if err != nil {
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusInternalServerError)

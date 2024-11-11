@@ -9,6 +9,7 @@ type ConfigService interface {
 	GetDomain() string
 	GetSupportedEmailProviders() []string
 	SetRealmConfig(realm models.RealmEntity)
+	GetApiKey() string
 }
 
 type DefaultConfigService struct {
@@ -17,6 +18,7 @@ type DefaultConfigService struct {
 	Token                   models.Token
 	Email                   models.Email
 	SupportedEmailProviders []string
+	ApiKey                  string
 }
 
 func NewDefaultConfigService(realm models.RealmEntity, database models.Database, emailApiKey string) *DefaultConfigService {
@@ -61,6 +63,10 @@ func (cs *DefaultConfigService) GetDatabaseConfig() *models.Database {
 
 func (cs *DefaultConfigService) GetDomain() string {
 	return cs.Domain
+}
+
+func (cs *DefaultConfigService) GetApiKey() string {
+	return cs.ApiKey
 }
 
 func (cs *DefaultConfigService) GetSupportedEmailProviders() []string {

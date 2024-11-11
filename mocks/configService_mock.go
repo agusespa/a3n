@@ -7,6 +7,7 @@ type MockConfigService struct {
 	Token                   models.Token
 	Email                   models.Email
 	SupportedEmailProviders []string
+	ApiKey                  string
 }
 
 func NewMockConfigService() *MockConfigService {
@@ -43,6 +44,10 @@ func (cs *MockConfigService) GetDatabaseConfig() *models.Database {
 
 func (cs *MockConfigService) GetDomain() string {
 	return cs.Domain
+}
+
+func (cs *MockConfigService) GetApiKey() string {
+	return cs.ApiKey
 }
 
 func (cs *MockConfigService) GetSupportedEmailProviders() []string {

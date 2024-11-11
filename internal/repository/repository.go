@@ -15,6 +15,7 @@ type AppRepository interface {
 	CreateUser(uuid string, body models.UserRequest, passwordHash []byte) (int64, error)
 	ReadUserByEmail(email string) (models.UserAuthEntity, error)
 	ReadUserById(userID int64) (models.UserAuthEntity, error)
+	DeleteUserByID(id int64) error
 	DeleteUserByUUID(uuid string) error
 	UpdateUserEmailVerification(email string) error
 	UpdateUserEmail(userID int64, email string) (int64, error)
@@ -317,6 +318,15 @@ func (repo *MySqlRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthE
 	}
 
 	return user, nil
+}
+
+func (repo *MySqlRepository) DeleteUserByID(id int64) error {
+	_, err := repo.DB.Exec("DELETE FROM users WHERE user_id = ?", id)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		return err
+	}
+	return nil
 }
 
 func (repo *MySqlRepository) DeleteUserByUUID(uuid string) error {

@@ -32,8 +32,8 @@ type DefaultAuthHandler struct {
 	Logger      logger.Logger
 }
 
-func NewDefaultAuthHandler(apiService service.AuthService, logger logger.Logger) *DefaultAuthHandler {
-	return &DefaultAuthHandler{AuthService: apiService, Logger: logger}
+func NewDefaultAuthHandler(authService service.AuthService, logger logger.Logger) *DefaultAuthHandler {
+	return &DefaultAuthHandler{AuthService: authService, Logger: logger}
 }
 
 func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
@@ -244,11 +244,25 @@ func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Reque
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
 	if r.Method == http.MethodGet {
-		h.HandleGetUserData(w, r)
+		claims, err := h.authenticateRequest(r)
+		if err != nil {
+			err = httperrors.NewError(err, http.StatusUnauthorized)
+			h.Logger.LogError(err)
+			payload.WriteError(w, r, err)
+			return
+		}
+		h.handleGetUserData(w, r, claims)
 	} else if r.Method == http.MethodPost {
-		h.HandlePostUserData(w, r)
+		h.handlePostUserData(w, r)
 	} else if r.Method == http.MethodDelete {
-		h.HandleDeleteUserData(w, r)
+		claims, err := h.authenticateRequest(r)
+		if err != nil {
+			err = httperrors.NewError(err, http.StatusUnauthorized)
+			h.Logger.LogError(err)
+			payload.WriteError(w, r, err)
+			return
+		}
+		h.handleDeleteUserData(w, r, claims)
 	} else {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -257,13 +271,13 @@ func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (h *DefaultAuthHandler) HandleGetUserData(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) authenticateRequest(r *http.Request) (models.CustomClaims, error) {
 	bearerToken := ""
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
 		bearerToken = strings.Split(authHeader, " ")[1]
 	} else {
-		cookie, err := r.Cookie("refresh_token")
+		cookie, err := r.Cookie("access_token")
 		if err == nil {
 			bearerToken = cookie.Value
 		}
@@ -271,30 +285,40 @@ func (h *DefaultAuthHandler) HandleGetUserData(w http.ResponseWriter, r *http.Re
 
 	if bearerToken == "" {
 		err := errors.New("missing access token")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
-		return
+		return models.CustomClaims{}, err
 	}
 
 	claims, err := h.AuthService.ValidateToken(bearerToken)
 	if err != nil {
-		payload.WriteError(w, r, err)
-		return
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		return models.CustomClaims{}, err
 	}
 
+	return claims, nil
+}
+
+func (h *DefaultAuthHandler) readIdQuery(r *http.Request) (int64, error) {
 	userIDquery := r.URL.Query().Get("id")
 	if userIDquery == "" {
 		err := errors.New("missing id parameter")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
-		payload.WriteError(w, r, err)
-		return
+		return 0, err
 	}
+
 	userID, err := strconv.ParseInt(userIDquery, 10, 64)
 	if err != nil {
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusInternalServerError)
+		return 0, err
+	}
+	return userID, nil
+}
+
+func (h *DefaultAuthHandler) handleGetUserData(w http.ResponseWriter, r *http.Request, claims models.CustomClaims) {
+	userID, err := h.readIdQuery(r)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -316,17 +340,24 @@ func (h *DefaultAuthHandler) HandleGetUserData(w http.ResponseWriter, r *http.Re
 	payload.Write(w, r, data, nil)
 }
 
-func (h *DefaultAuthHandler) HandleDeleteUserData(w http.ResponseWriter, r *http.Request) {
-	uuidStr := r.URL.Query().Get("uuid")
-	if uuidStr == "" {
-		err := errors.New("missing uuid parameter")
+func (h *DefaultAuthHandler) handleDeleteUserData(w http.ResponseWriter, r *http.Request, claims models.CustomClaims) {
+	userID, err := h.readIdQuery(r)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
 		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusBadRequest)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	err := h.AuthService.DeleteUser(uuidStr)
+	if claims.User.UserID != userID || claims.Type != "admin" {
+		err := errors.New("user doesn't have permissions to access this data")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	err = h.AuthService.DeleteUserByID(userID)
 	if err != nil {
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusInternalServerError)
@@ -335,7 +366,7 @@ func (h *DefaultAuthHandler) HandleDeleteUserData(w http.ResponseWriter, r *http
 	}
 }
 
-func (h *DefaultAuthHandler) HandlePostUserData(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) handlePostUserData(w http.ResponseWriter, r *http.Request) {
 	var userReq models.UserRequest
 	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
 		err = httperrors.NewError(err, http.StatusBadRequest)
@@ -383,27 +414,10 @@ func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, 
 		return
 	}
 
-	bearerToken := ""
-	authHeader := r.Header.Get("Authorization")
-	if authHeader != "" {
-		bearerToken = strings.Split(authHeader, " ")[1]
-	} else {
-		cookie, err := r.Cookie("refresh_token")
-		if err == nil {
-			bearerToken = cookie.Value
-		}
-	}
-
-	if bearerToken == "" {
-		err := errors.New("missing access token")
-		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	claims, err := h.AuthService.ValidateToken(bearerToken)
+	claims, err := h.authenticateRequest(r)
 	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -434,27 +448,10 @@ func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *
 		return
 	}
 
-	bearerToken := ""
-	authHeader := r.Header.Get("Authorization")
-	if authHeader != "" {
-		bearerToken = strings.Split(authHeader, " ")[1]
-	} else {
-		cookie, err := r.Cookie("refresh_token")
-		if err == nil {
-			bearerToken = cookie.Value
-		}
-	}
-
-	if bearerToken == "" {
-		err := errors.New("missing access token")
-		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	claims, err := h.AuthService.ValidateToken(bearerToken)
+	claims, err := h.authenticateRequest(r)
 	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
@@ -466,7 +463,6 @@ func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *
 		payload.WriteError(w, r, err)
 	}
 
-	w.Header().Set("X-User-UUID", claims.User.UserUUID)
 	payload.Write(w, r, nil, nil)
 }
 

@@ -26,7 +26,8 @@ import (
 
 type AuthService interface {
 	PostUser(body models.UserRequest) (int64, error)
-	DeleteUser(uuid string) error
+	DeleteUserByID(id int64) error
+	DeleteUserByUUID(uuid string) error
 	BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error)
 	PutUserEmailVerification(email string) error
 	PutUserEmail(username, password, newEmail string) (int64, error)
@@ -102,7 +103,16 @@ func (as *DefaultAuthService) PostUser(body models.UserRequest) (int64, error) {
 	return id, nil
 }
 
-func (as *DefaultAuthService) DeleteUser(uuid string) error {
+func (as *DefaultAuthService) DeleteUserByID(id int64) error {
+	if err := as.AppRepo.DeleteUserByID(id); err != nil {
+		as.Logger.LogError(err)
+		return err
+	}
+
+	return nil
+}
+
+func (as *DefaultAuthService) DeleteUserByUUID(uuid string) error {
 	if err := as.AppRepo.DeleteUserByUUID(uuid); err != nil {
 		as.Logger.LogError(err)
 		return err

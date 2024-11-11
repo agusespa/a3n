@@ -76,7 +76,7 @@ func main() {
 
 	realmHandler := handlers.NewDefaultRealmHandler(realmService, logg)
 
-	apiHandler := handlers.NewDefaultApiHandler(authService, logg)
+	apiHandler := handlers.NewDefaultApiHandler(authService, appConfig, logg)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/auth/login", authHandler.HandleUserLogin)
