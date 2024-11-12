@@ -54,7 +54,7 @@ func (rs *DefaultRealmService) GetRealmById(realmID int64) (models.RealmEntity, 
 
 func (rs *DefaultRealmService) PutRealm(req models.RealmRequest) error {
 	if req.EmailAddr != "" {
-		if !IsValidEmail(req.EmailAddr) {
+		if !helpers.IsValidEmail(req.EmailAddr) {
 			err := errors.New("not a valid email address")
 			err = httperrors.NewError(err, http.StatusBadRequest)
 			rs.Logger.LogError(err)

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/agusespa/a3n/internal/helpers"
-	"github.com/agusespa/a3n/internal/service"
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
@@ -164,14 +163,14 @@ func main() {
 		fmt.Print("Enter email: ")
 		email, _ := reader.ReadString('\n')
 		email = strings.TrimSpace(email)
-		if !service.IsValidEmail(email) {
+		if !helpers.IsValidEmail(email) {
 			log.Fatal("not a valid email address")
 		}
 
 		fmt.Print("Enter password: ")
 		password, _ := reader.ReadString('\n')
 		password = strings.TrimSpace(password)
-		if !service.IsValidPassword(password) {
+		if !helpers.IsValidPassword(password) {
 			log.Fatal("password doesn't meet minimum criteria")
 		}
 
