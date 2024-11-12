@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
-	"net/mail"
-	"regexp"
 	"strings"
 	"time"
 
@@ -62,19 +60,6 @@ func NewDefaultAuthService(appRepo *repository.MySqlRepository, config *DefaultC
 }
 
 func (as *DefaultAuthService) PostUser(body models.UserRequest) (int64, error) {
-	if !IsValidEmail(body.Email) {
-		err := errors.New("not a valid email address")
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		as.Logger.LogError(err)
-		return 0, err
-	}
-	if !IsValidPassword(body.Password) {
-		err := errors.New("password doesn't meet minimum criteria")
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		as.Logger.LogError(err)
-		return 0, err
-	}
-
 	var uuidStr string
 	if body.UserUUID == "" {
 		uuidStr = uuid.New().String()
@@ -139,13 +124,6 @@ func (as *DefaultAuthService) PutUserEmailVerification(email string) error {
 }
 
 func (as *DefaultAuthService) PutUserEmail(username, password, newEmail string) (int64, error) {
-	if !IsValidEmail(newEmail) {
-		err := errors.New("not a valid email address")
-		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		return 0, err
-	}
-
 	userData, err := as.AppRepo.ReadUserByEmail(username)
 	if err != nil {
 		as.Logger.LogError(err)
@@ -168,13 +146,6 @@ func (as *DefaultAuthService) PutUserEmail(username, password, newEmail string) 
 }
 
 func (as *DefaultAuthService) PutUserPassword(username, password, newPassword string) (int64, error) {
-	if !IsValidPassword(newPassword) {
-		err := errors.New("password doesn't meet minimum criteria")
-		as.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		return 0, err
-	}
-
 	userData, err := as.AppRepo.ReadUserByEmail(username)
 	if err != nil {
 		as.Logger.LogError(err)
@@ -494,17 +465,6 @@ func (as *DefaultAuthService) generateEmailVerifyJWT(email string) (string, erro
 func verifyHashedPassword(hashedPassword []byte, password string) error {
 	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(password))
 	return err
-}
-
-func IsValidEmail(email string) bool {
-	_, err := mail.ParseAddress(email)
-	return err == nil
-}
-
-func IsValidPassword(password string) bool {
-	regexPattern := `^.{8,}$`
-	match, _ := regexp.MatchString(regexPattern, password)
-	return match
 }
 
 func (as *DefaultAuthService) BuildCookie(name, value string, options models.CookieOptions) *http.Cookie {

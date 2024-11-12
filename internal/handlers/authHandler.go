@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/agusespa/a3n/internal/helpers"
 	"github.com/agusespa/a3n/internal/httperrors"
 	"github.com/agusespa/a3n/internal/models"
 	"github.com/agusespa/a3n/internal/payload"
@@ -70,6 +71,13 @@ func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *htt
 		return
 	}
 
+	if !helpers.IsValidEmail(req.NewEmail) {
+		err := errors.New("not a valid email address")
+		h.Logger.LogError(err)
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		return
+	}
+
 	id, err := h.AuthService.PutUserEmail(req.Email, req.Password, req.NewEmail)
 	if err != nil {
 		payload.WriteError(w, r, err)
@@ -114,6 +122,13 @@ func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *
 		err = httperrors.NewError(err, http.StatusBadRequest)
 		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
+		return
+	}
+
+	if !helpers.IsValidPassword(req.NewPassword) {
+		err := errors.New("password doesn't meet minimum criteria")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
 		return
 	}
 
@@ -388,6 +403,19 @@ func (h *DefaultAuthHandler) handlePostUserData(w http.ResponseWriter, r *http.R
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
+		return
+	}
+
+	if !helpers.IsValidEmail(userReq.Email) {
+		err := errors.New("not a valid email address")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		return
+	}
+	if !helpers.IsValidPassword(userReq.Password) {
+		err := errors.New("password doesn't meet minimum criteria")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
 		return
 	}
 

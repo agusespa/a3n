@@ -2,6 +2,8 @@ package helpers
 
 import (
 	"database/sql"
+	"net/mail"
+	"regexp"
 	"strconv"
 )
 
@@ -18,4 +20,15 @@ func StringToInt64(s string) (int64, error) {
 		return 0, err
 	}
 	return i, nil
+}
+
+func IsValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+func IsValidPassword(password string) bool {
+	regexPattern := `^.{8,}$`
+	match, _ := regexp.MatchString(regexPattern, password)
+	return match
 }
