@@ -73,8 +73,9 @@ func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *htt
 
 	if !helpers.IsValidEmail(req.NewEmail) {
 		err := errors.New("not a valid email address")
-		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
 		return
 	}
 
@@ -129,6 +130,7 @@ func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *
 		err := errors.New("password doesn't meet minimum criteria")
 		err = httperrors.NewError(err, http.StatusBadRequest)
 		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
 		return
 	}
 
@@ -410,12 +412,14 @@ func (h *DefaultAuthHandler) handlePostUserData(w http.ResponseWriter, r *http.R
 		err := errors.New("not a valid email address")
 		err = httperrors.NewError(err, http.StatusBadRequest)
 		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
 		return
 	}
 	if !helpers.IsValidPassword(userReq.Password) {
 		err := errors.New("password doesn't meet minimum criteria")
 		err = httperrors.NewError(err, http.StatusBadRequest)
 		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
 		return
 	}
 
