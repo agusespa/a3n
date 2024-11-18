@@ -18,8 +18,8 @@ type AppRepository interface {
 	DeleteUserByID(id int64) error
 	DeleteUserByUUID(uuid string) error
 	UpdateUserEmailVerification(email string) error
-	UpdateUserEmail(userID int64, email string) (int64, error)
-	UpdateUserPassword(userID int64, hashedPassword *[]byte) (int64, error)
+	UpdateUserEmail(userID int64, email string) error
+	UpdateUserPassword(userID int64, hashedPassword *[]byte) error
 	ReadUserByToken(tokenHash []byte) (models.UserAuthEntity, error)
 	CreateRefreshToken(userID int64, tokenHash []byte) error
 	DeleteTokenByHash(tokenHash []byte) error
@@ -248,28 +248,28 @@ func (repo *MySqlRepository) UpdateRealm(realm models.RealmEntity) error {
 	return nil
 }
 
-func (repo *MySqlRepository) UpdateUserEmail(userID int64, email string) (int64, error) {
+func (repo *MySqlRepository) UpdateUserEmail(userID int64, email string) error {
 	_, err := repo.DB.Exec("UPDATE users SET email = ? WHERE user_id = ?", email, userID)
 	if err != nil {
 		if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1064 {
 			err = httperrors.NewError(err, http.StatusBadRequest)
-			return 0, err
+			return err
 		}
 		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return 0, err
+		return err
 	}
 
-	return userID, nil
+	return nil
 }
 
-func (repo *MySqlRepository) UpdateUserPassword(userID int64, hashedPassword *[]byte) (int64, error) {
+func (repo *MySqlRepository) UpdateUserPassword(userID int64, hashedPassword *[]byte) error {
 	_, err := repo.DB.Exec("UPDATE users SET password_hash = ? WHERE user_id = ?", *hashedPassword, userID)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return 0, err
+		return err
 	}
 
-	return userID, nil
+	return nil
 }
 
 func (repo *MySqlRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthEntity, error) {

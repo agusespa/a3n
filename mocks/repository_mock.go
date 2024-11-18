@@ -82,18 +82,18 @@ func (m *MockAppRepository) UpdateUserEmailVerification(email string) error {
 	return httperrors.NewError(errors.New("user not found"), http.StatusBadRequest)
 }
 
-func (m *MockAppRepository) UpdateUserEmail(userID int64, email string) (int64, error) {
+func (m *MockAppRepository) UpdateUserEmail(userID int64, email string) error {
 	if userID == mockUser.UserID {
-		return userID, nil
+		return nil
 	}
-	return 0, httperrors.NewError(errors.New("user not found"), http.StatusBadRequest)
+	return httperrors.NewError(errors.New("user not found"), http.StatusBadRequest)
 }
 
-func (m *MockAppRepository) UpdateUserPassword(userID int64, hashedPassword *[]byte) (int64, error) {
+func (m *MockAppRepository) UpdateUserPassword(userID int64, hashedPassword *[]byte) error {
 	if userID == mockUser.UserID {
-		return userID, nil
+		return nil
 	}
-	return 0, httperrors.NewError(errors.New("user not found"), http.StatusBadRequest)
+	return httperrors.NewError(errors.New("user not found"), http.StatusBadRequest)
 }
 
 func (m *MockAppRepository) ReadUserByToken(tokenHash []byte) (models.UserAuthEntity, error) {

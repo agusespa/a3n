@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/agusespa/a3n/internal/helpers"
@@ -17,12 +16,9 @@ import (
 )
 
 type AuthHandler interface {
-	HandleUserData(w http.ResponseWriter, r *http.Request)
-	HandleUserEmailChange(w http.ResponseWriter, r *http.Request)
-	HandleUserPasswordChange(w http.ResponseWriter, r *http.Request)
+	HandleUser(w http.ResponseWriter, r *http.Request)
 	HandleUserLogin(w http.ResponseWriter, r *http.Request)
 	HandleUserRefresh(w http.ResponseWriter, r *http.Request)
-	HandleUserEmailVerification(w http.ResponseWriter, r *http.Request)
 	HandleUserAuthentication(w http.ResponseWriter, r *http.Request)
 	HandleTokenRevocation(w http.ResponseWriter, r *http.Request)
 	HandleAllUserTokensRevocation(w http.ResponseWriter, r *http.Request)
@@ -37,114 +33,71 @@ func NewDefaultAuthHandler(authService service.AuthService, logger logger.Logger
 	return &DefaultAuthHandler{AuthService: authService, Logger: logger}
 }
 
-func (h *DefaultAuthHandler) HandleUserEmailChange(w http.ResponseWriter, r *http.Request) {
+func (h *DefaultAuthHandler) HandleUser(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
-	if r.Method != http.MethodPut {
-		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
-		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	var req models.CredentialsChangeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	if req.Email == "" || req.Password == "" {
-		err := errors.New("missing credentials")
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	if req.NewEmail == "" {
-		err := errors.New("missing new email address")
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	if !helpers.IsValidEmail(req.NewEmail) {
-		err := errors.New("not a valid email address")
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	id, err := h.AuthService.PutUserEmail(req.Email, req.Password, req.NewEmail)
+	path := strings.TrimPrefix(r.URL.Path, "/auth/user/")
+	parts := strings.Split(path, "/")
+	userID, err := helpers.StringToInt64(parts[0])
 	if err != nil {
+		err = httperrors.NewError(err, http.StatusInternalServerError)
+		h.Logger.LogError(err)
 		payload.WriteError(w, r, err)
 		return
 	}
 
-	res := models.RegistrationResponse{
-		UserID: id,
+	switch {
+	case len(parts) < 2:
+		// user/{id}
+		h.handleUserData(w, r, userID)
+	case len(parts) == 2 && parts[1] == "verify":
+		// user/{id}/verify
+		h.handleUserEmailVerification(w, r, userID)
+	case len(parts) == 2 && parts[1] == "email":
+		// user/{id}/email
+		h.handleUserEmailChange(w, r, userID)
+	case len(parts) == 2 && parts[1] == "password":
+		// user/{id}/password
+		h.handleUserPasswordChange(w, r, userID)
+	default:
+		http.NotFound(w, r)
 	}
-
-	payload.Write(w, r, res, nil)
 }
 
-func (h *DefaultAuthHandler) HandleUserPasswordChange(w http.ResponseWriter, r *http.Request) {
-	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
-
-	if r.Method != http.MethodPut {
-		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
-		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
-		payload.WriteError(w, r, err)
+func (h *DefaultAuthHandler) handleUserData(w http.ResponseWriter, r *http.Request, userID int64) {
+	if r.Method == http.MethodPost {
+		h.handlePostUserData(w, r)
 		return
+	} else {
+		if userID == 0 {
+			err := errors.New("User ID required")
+			err = httperrors.NewError(err, http.StatusBadRequest)
+			h.Logger.LogError(err)
+			payload.WriteError(w, r, err)
+			return
+		}
+
+		_, err := h.authenticateRequest(r, userID)
+		if err != nil {
+			err = httperrors.NewError(err, http.StatusUnauthorized)
+			h.Logger.LogError(err)
+			payload.WriteError(w, r, err)
+			return
+		}
+
+		if r.Method == http.MethodGet {
+			h.handleGetUserData(w, r, userID)
+			return
+
+		} else if r.Method == http.MethodDelete {
+			h.handleDeleteUserData(w, r, userID)
+			return
+		}
 	}
 
-	var req models.CredentialsChangeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	if req.Email == "" || req.Password == "" {
-		err := errors.New("missing credentials")
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	if req.NewPassword == "" {
-		err := errors.New("missing new password")
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	if !helpers.IsValidPassword(req.NewPassword) {
-		err := errors.New("password doesn't meet minimum criteria")
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	id, err := h.AuthService.PutUserPassword(req.Email, req.Password, req.NewPassword)
-	if err != nil {
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	res := models.RegistrationResponse{
-		UserID: id,
-	}
-
-	payload.Write(w, r, res, nil)
+	h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
+	err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+	payload.WriteError(w, r, err)
 }
 
 func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Request) {
@@ -204,6 +157,120 @@ func (h *DefaultAuthHandler) HandleUserLogin(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+func (h *DefaultAuthHandler) handleUserEmailChange(w http.ResponseWriter, r *http.Request, userID int64) {
+	if r.Method != http.MethodPut {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	_, err := h.authenticateRequest(r, userID)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	var req models.CredentialsChangeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if req.Email == "" || req.Password == "" {
+		err := errors.New("missing credentials")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if req.NewEmail == "" {
+		err := errors.New("missing new email address")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if !helpers.IsValidEmail(req.NewEmail) {
+		err := errors.New("not a valid email address")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	err = h.AuthService.PutUserEmail(req.Email, req.Password, req.NewEmail)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	payload.Write(w, r, nil, nil)
+}
+
+func (h *DefaultAuthHandler) handleUserPasswordChange(w http.ResponseWriter, r *http.Request, userID int64) {
+	if r.Method != http.MethodPut {
+		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
+		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	_, err := h.authenticateRequest(r, userID)
+	if err != nil {
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	var req models.CredentialsChangeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if req.Email == "" || req.Password == "" {
+		err := errors.New("missing credentials")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if req.NewPassword == "" {
+		err := errors.New("missing new password")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	if !helpers.IsValidPassword(req.NewPassword) {
+		err := errors.New("password doesn't meet minimum criteria")
+		err = httperrors.NewError(err, http.StatusBadRequest)
+		h.Logger.LogError(err)
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	err = h.AuthService.PutUserPassword(req.Email, req.Password, req.NewPassword)
+	if err != nil {
+		payload.WriteError(w, r, err)
+		return
+	}
+
+	payload.Write(w, r, nil, nil)
+}
+
 func (h *DefaultAuthHandler) HandleUserRefresh(w http.ResponseWriter, r *http.Request) {
 	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
 
@@ -257,38 +324,7 @@ func (h *DefaultAuthHandler) HandleUserRefresh(w http.ResponseWriter, r *http.Re
 	}
 }
 
-func (h *DefaultAuthHandler) HandleUserData(w http.ResponseWriter, r *http.Request) {
-	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
-
-	if r.Method == http.MethodGet {
-		claims, err := h.authenticateRequest(r)
-		if err != nil {
-			err = httperrors.NewError(err, http.StatusUnauthorized)
-			h.Logger.LogError(err)
-			payload.WriteError(w, r, err)
-			return
-		}
-		h.handleGetUserData(w, r, claims)
-	} else if r.Method == http.MethodPost {
-		h.handlePostUserData(w, r)
-	} else if r.Method == http.MethodDelete {
-		claims, err := h.authenticateRequest(r)
-		if err != nil {
-			err = httperrors.NewError(err, http.StatusUnauthorized)
-			h.Logger.LogError(err)
-			payload.WriteError(w, r, err)
-			return
-		}
-		h.handleDeleteUserData(w, r, claims)
-	} else {
-		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
-		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
-		payload.WriteError(w, r, err)
-		return
-	}
-}
-
-func (h *DefaultAuthHandler) authenticateRequest(r *http.Request) (models.CustomClaims, error) {
+func (h *DefaultAuthHandler) authenticateRequest(r *http.Request, requestedUserID int64) (models.CustomClaims, error) {
 	bearerToken := ""
 	authHeader := r.Header.Get("Authorization")
 	if authHeader != "" {
@@ -312,42 +348,16 @@ func (h *DefaultAuthHandler) authenticateRequest(r *http.Request) (models.Custom
 		return models.CustomClaims{}, err
 	}
 
+	if requestedUserID != 0 && claims.User.UserID != requestedUserID {
+		err := errors.New("user doesn't have permissions to access this data")
+		err = httperrors.NewError(err, http.StatusUnauthorized)
+		return models.CustomClaims{}, err
+	}
+
 	return claims, nil
 }
 
-func (h *DefaultAuthHandler) readIdQuery(r *http.Request) (int64, error) {
-	userIDquery := r.URL.Query().Get("id")
-	if userIDquery == "" {
-		err := errors.New("missing id parameter")
-		err = httperrors.NewError(err, http.StatusBadRequest)
-		return 0, err
-	}
-
-	userID, err := strconv.ParseInt(userIDquery, 10, 64)
-	if err != nil {
-		err = httperrors.NewError(err, http.StatusInternalServerError)
-		return 0, err
-	}
-	return userID, nil
-}
-
-func (h *DefaultAuthHandler) handleGetUserData(w http.ResponseWriter, r *http.Request, claims models.CustomClaims) {
-	userID, err := h.readIdQuery(r)
-	if err != nil {
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	if claims.User.UserID != userID || claims.Type != "admin" {
-		err := errors.New("user doesn't have permissions to access this data")
-		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
-		return
-	}
-
+func (h *DefaultAuthHandler) handleGetUserData(w http.ResponseWriter, r *http.Request, userID int64) {
 	data, err := h.AuthService.GetUserData(userID)
 	if err != nil {
 		payload.WriteError(w, r, err)
@@ -357,24 +367,8 @@ func (h *DefaultAuthHandler) handleGetUserData(w http.ResponseWriter, r *http.Re
 	payload.Write(w, r, data, nil)
 }
 
-func (h *DefaultAuthHandler) handleDeleteUserData(w http.ResponseWriter, r *http.Request, claims models.CustomClaims) {
-	userID, err := h.readIdQuery(r)
-	if err != nil {
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		h.Logger.LogError(err)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	if claims.User.UserID != userID || claims.Type != "admin" {
-		err := errors.New("user doesn't have permissions to access this data")
-		h.Logger.LogError(err)
-		err = httperrors.NewError(err, http.StatusUnauthorized)
-		payload.WriteError(w, r, err)
-		return
-	}
-
-	err = h.AuthService.DeleteUserByID(userID)
+func (h *DefaultAuthHandler) handleDeleteUserData(w http.ResponseWriter, r *http.Request, userID int64) {
+	err := h.AuthService.DeleteUserByID(userID)
 	if err != nil {
 		h.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusInternalServerError)
@@ -436,9 +430,7 @@ func (h *DefaultAuthHandler) handlePostUserData(w http.ResponseWriter, r *http.R
 	payload.Write(w, r, res, nil)
 }
 
-func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, r *http.Request) {
-	h.Logger.LogInfo(fmt.Sprintf("%s %v", r.Method, r.URL))
-
+func (h *DefaultAuthHandler) handleUserEmailVerification(w http.ResponseWriter, r *http.Request, userID int64) {
 	if r.Method != http.MethodPut {
 		h.Logger.LogError(fmt.Errorf("%s method not allowed for %v", r.Method, r.URL))
 		err := httperrors.NewError(nil, http.StatusMethodNotAllowed)
@@ -446,7 +438,7 @@ func (h *DefaultAuthHandler) HandleUserEmailVerification(w http.ResponseWriter, 
 		return
 	}
 
-	claims, err := h.authenticateRequest(r)
+	claims, err := h.authenticateRequest(r, userID)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		h.Logger.LogError(err)
@@ -480,7 +472,7 @@ func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *
 		return
 	}
 
-	claims, err := h.authenticateRequest(r)
+	claims, err := h.authenticateRequest(r, 0)
 	if err != nil {
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		h.Logger.LogError(err)
@@ -494,6 +486,10 @@ func (h *DefaultAuthHandler) HandleUserAuthentication(w http.ResponseWriter, r *
 		err = httperrors.NewError(err, http.StatusUnauthorized)
 		payload.WriteError(w, r, err)
 	}
+
+	w.Header().Set("X-Auth-ID", fmt.Sprint(claims.User.UserID))
+	w.Header().Set("X-Auth-UUID", claims.User.UserUUID)
+	w.Header().Set("X-Auth-Roles", strings.Join(claims.Roles, ", "))
 
 	payload.Write(w, r, nil, nil)
 }

@@ -28,8 +28,8 @@ type AuthService interface {
 	DeleteUserByUUID(uuid string) error
 	BuildVerificationEmail(firstName, lastName, email string) (*email.SGMailV3, error)
 	PutUserEmailVerification(email string) error
-	PutUserEmail(username, password, newEmail string) (int64, error)
-	PutUserPassword(username, password, newPassword string) (int64, error)
+	PutUserEmail(username, password, newEmail string) error
+	PutUserPassword(username, password, newPassword string) error
 	GetUserData(id int64) (models.UserData, error)
 	GetUserLogin(username, password string) (models.UserAuthData, error)
 	GetAdminUserLogin(username, password, ipAddr string) (models.UserAuthData, error)
@@ -123,53 +123,53 @@ func (as *DefaultAuthService) PutUserEmailVerification(email string) error {
 	return err
 }
 
-func (as *DefaultAuthService) PutUserEmail(username, password, newEmail string) (int64, error) {
+func (as *DefaultAuthService) PutUserEmail(username, password, newEmail string) error {
 	userData, err := as.AppRepo.ReadUserByEmail(username)
 	if err != nil {
 		as.Logger.LogError(err)
-		return 0, err
+		return err
 	}
 
 	if err := verifyHashedPassword(userData.PasswordHash, password); err != nil {
 		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return 0, err
+		return err
 	}
 
-	id, err := as.AppRepo.UpdateUserEmail(userData.UserID, newEmail)
+	err = as.AppRepo.UpdateUserEmail(userData.UserID, newEmail)
 	if err != nil {
 		as.Logger.LogError(err)
-		return 0, err
+		return err
 	}
 
-	return id, nil
+	return nil
 }
 
-func (as *DefaultAuthService) PutUserPassword(username, password, newPassword string) (int64, error) {
+func (as *DefaultAuthService) PutUserPassword(username, password, newPassword string) error {
 	userData, err := as.AppRepo.ReadUserByEmail(username)
 	if err != nil {
 		as.Logger.LogError(err)
-		return 0, err
+		return err
 	}
 
 	if err := verifyHashedPassword(userData.PasswordHash, password); err != nil {
 		as.Logger.LogError(err)
 		err = httperrors.NewError(err, http.StatusUnauthorized)
-		return 0, err
+		return err
 	}
 
 	hashedPassword, err := as.hashPassword(newPassword)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	id, err := as.AppRepo.UpdateUserPassword(userData.UserID, &hashedPassword)
+	err = as.AppRepo.UpdateUserPassword(userData.UserID, &hashedPassword)
 	if err != nil {
 		as.Logger.LogError(err)
-		return 0, err
+		return err
 	}
 
-	return id, nil
+	return nil
 }
 
 func (as *DefaultAuthService) GetUserLogin(username, password string) (models.UserAuthData, error) {

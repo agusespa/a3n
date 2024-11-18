@@ -82,10 +82,7 @@ func main() {
 	mux.HandleFunc("/auth/login", authHandler.HandleUserLogin)
 	mux.HandleFunc("/auth/authenticate", authHandler.HandleUserAuthentication)
 	mux.HandleFunc("/auth/refresh", authHandler.HandleUserRefresh)
-	mux.HandleFunc("/auth/user/verify", authHandler.HandleUserEmailVerification)
-	mux.HandleFunc("/auth/user/email", authHandler.HandleUserEmailChange)
-	mux.HandleFunc("/auth/user/password", authHandler.HandleUserPasswordChange)
-	mux.HandleFunc("/auth/user", authHandler.HandleUserData)
+	mux.HandleFunc("/auth/user", authHandler.HandleUser)
 	mux.HandleFunc("/auth/globallogout", authHandler.HandleAllUserTokensRevocation)
 	mux.HandleFunc("/auth/singlelogout", authHandler.HandleTokenRevocation)
 
@@ -98,7 +95,7 @@ func main() {
 
 	mux.HandleFunc("/realm", realmHandler.HandleRealm)
 
-	mux.HandleFunc("/api/user", apiHandler.HandleUserData)
+	mux.HandleFunc("/api/user", apiHandler.HandleUser)
 
 	port := os.Getenv("A3N_PORT")
 	if port == "" {

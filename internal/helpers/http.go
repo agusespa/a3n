@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"errors"
 	"net"
 	"net/http"
 )
@@ -12,4 +13,13 @@ func GetIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return ip
+}
+
+func ReadQuery(r *http.Request, param string) (string, error) {
+	value := r.URL.Query().Get(param)
+	if value == "" {
+		err := errors.New("missing parameter: " + param)
+		return "", err
+	}
+	return value, nil
 }
